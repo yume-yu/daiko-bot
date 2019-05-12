@@ -350,11 +350,12 @@ class makeShiftImg:
         return self.image
 
 
-make = makeShiftImg(
-    "./shift.json",
-    "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-    "/Library/Fonts/Arial.ttf",
-)
-image = make.makeImage()
-image.show()
+if __name__ == "__main__":
+    make = makeShiftImg(
+        "./shift.json",
+        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        "/Library/Fonts/Arial.ttf",
+    )
+    image = make.makeImage()
+    image.show()
 # image.save("./sample.jpg", quality=95)
