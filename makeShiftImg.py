@@ -225,7 +225,11 @@ class makeShiftImg:
             )
 
     def printWorkTimerect(
-        self, font=None, colorTable=SHIFTTIME_RECT_COLORS, textColor=BLACK
+        self,
+        font=None,
+        colorTable=SHIFTTIME_RECT_COLORS,
+        textColor=BLACK,
+        timepos="None",
     ):
         if font is None:
             font = self.smallFont
@@ -252,48 +256,49 @@ class makeShiftImg:
                         self.drawObj.polygon(apex, self.LIGHT_GRAY)
 
                 else:
-                    # 最後の勤務の矩形の下に総勤務時間
-                    self.drawObj.text(
-                        (
-                            rectApex[2][0]
-                            - font.getsize(str(worktimePerDay))[0]
-                            - worktimeTextOffset,
-                            rectApex[2][1],
-                        ),
-                        str(worktimePerDay),
-                        textColor,
-                        font,
-                    )
-                    """
-                    # 名前の右下に総勤務時間
-                    self.drawObj.text(
-                        (
-                            rectApex[2][0]
-                            - font.getsize(str(worktimePerDay))[0]
-                            - worktimeTextOffset,
-                            2 * self.columnHeight
-                            + self.heightOffset
-                            - font.getsize(str(worktimePerDay))[1]
-                            - worktimeTextOffset,
-                        ),
-                        str(worktimePerDay),
-                        textColor,
-                        font,
-                    )
-                    # 一番下の行に総勤務時間
-                    self.drawObj.text(
-                        (
-                            rectApex[2][0]
-                            - font.getsize(str(worktimePerDay))[0]
-                            - worktimeTextOffset,
-                            self.heightOffset
-                            + self.columnHeight * 22,  # self.needColumns
-                        ),
-                        str(worktimePerDay),
-                        textColor,
-                        font,
-                    )
-                    """
+                    if timepos is "rect":
+                        # 最後の勤務の矩形の下に総勤務時間
+                        self.drawObj.text(
+                            (
+                                rectApex[2][0]
+                                - font.getsize(str(worktimePerDay))[0]
+                                - worktimeTextOffset,
+                                rectApex[2][1],
+                            ),
+                            str(worktimePerDay),
+                            textColor,
+                            font,
+                        )
+                    elif timepos is "name":
+                        # 名前の右下に総勤務時間
+                        self.drawObj.text(
+                            (
+                                rectApex[2][0]
+                                - font.getsize(str(worktimePerDay))[0]
+                                - worktimeTextOffset,
+                                2 * self.columnHeight
+                                + self.heightOffset
+                                - font.getsize(str(worktimePerDay))[1]
+                                - worktimeTextOffset,
+                            ),
+                            str(worktimePerDay),
+                            textColor,
+                            font,
+                        )
+                    elif timepos is "bottom":
+                        # 一番下の行に総勤務時間
+                        self.drawObj.text(
+                            (
+                                rectApex[2][0]
+                                - font.getsize(str(worktimePerDay))[0]
+                                - worktimeTextOffset,
+                                self.heightOffset
+                                + self.columnHeight * 22,  # self.needColumns
+                            ),
+                            str(worktimePerDay),
+                            textColor,
+                            font,
+                        )
                     rowCounter += 1
                     worktimePerDay = 0
 
