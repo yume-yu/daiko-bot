@@ -94,7 +94,7 @@ class Shift:
         self.sort_by_starttime()
 
 
-class draw_shift_img:
+class DrawShiftImg:
 
     FOR_WIDTH_RATIO = 1624 / 38
     BLACK = (0, 0, 0)
@@ -126,9 +126,9 @@ class draw_shift_img:
         self.font = ImageFont.truetype(str(fontPath), 25)
         self.smallFont = ImageFont.truetype(str(fontPath), 15)
         self.kanjiFont = ImageFont.truetype(str(kanjiFontPath), 25)
-        self.width = int(draw_shift_img.FOR_WIDTH_RATIO * self.needRows)
-        self.height = draw_shift_img.HEIGHT
-        self.image = Image.new("RGB", (self.width, self.height), draw_shift_img.WHITE)
+        self.width = int(DrawShiftImg.FOR_WIDTH_RATIO * self.needRows)
+        self.height = DrawShiftImg.HEIGHT
+        self.image = Image.new("RGB", (self.width, self.height), DrawShiftImg.WHITE)
         self.drawObj = ImageDraw.Draw(self.image)
         # 罫線を引くためのプロパティ
         self.needColumns = 23  # 名前部分を除いた必要な列数
@@ -143,9 +143,9 @@ class draw_shift_img:
             self.shift = newshift
         divWidth = self.count_need_row()  # シフトを挿入する列数
         self.needRows = divWidth + 4  # 表の余白分を含めた列数
-        self.width = int(draw_shift_img.FOR_WIDTH_RATIO * self.needRows)
-        self.height = draw_shift_img.HEIGHT
-        self.image = Image.new("RGB", (self.width, self.height), draw_shift_img.WHITE)
+        self.width = int(DrawShiftImg.FOR_WIDTH_RATIO * self.needRows)
+        self.height = DrawShiftImg.HEIGHT
+        self.image = Image.new("RGB", (self.width, self.height), DrawShiftImg.WHITE)
         self.drawObj = ImageDraw.Draw(self.image)
         # 罫線を引くためのプロパティ
         self.needColumns = 23  # 名前部分を除いた必要な列数
@@ -428,7 +428,7 @@ class draw_shift_img:
 
 if __name__ == "__main__":
     shift = Shift("./shift.json")
-    make = draw_shift_img(
+    make = DrawShiftImg(
         shift,
         "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
         "/Library/Fonts/Arial.ttf",
