@@ -54,9 +54,11 @@ class Shift:
         for weekday in self.shift:
             for worker in self.shift[weekday]["worker"]:
                 # worker["worktime"] =
+                print(worker)
                 worker["worktime"] = sorted(
                     worker["worktime"], key=lambda x: x["start"]
                 )
+                print("ss:" + str(worker["worktime"]))
             self.shift[weekday]["worker"] = sorted(
                 self.shift[weekday]["worker"],
                 key=lambda x: (x["worktime"][0]["start"], x["worktime"][0]["end"]),
@@ -71,8 +73,8 @@ class Shift:
         else:
             newWorker = {"name": name, "worktime": [worktime]}
             self.shift[weekday]["worker"].append(newWorker)
-
         self.sort_by_starttime()
+        print(self.shift[weekday])
 
     def delete(self, weekday, name, index=1):
         weekday = Shift.exchange_weekdayname(weekday)
@@ -470,11 +472,8 @@ if __name__ == "__main__":
     image.show()
     make.shift.export("./export.json")
     shift = Shift("./export.json")
-    make = DrawShiftImg(
-        shift,
-        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-        "/Library/Fonts/Arial.ttf",
-    )
+    make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
+    make.update()
     image = make.makeImage()
     image.show()
 
