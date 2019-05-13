@@ -83,15 +83,41 @@ class Shift:
                     self.shift[weekday]["worker"].remove(worker)
         self.sort_by_starttime()
 
-    def update(self, weekday, name, index=1, start=None, end=None):
+    def update(self, weekday, name, worktime, index=1):
         weekday = Shift.exchange_weekdayname(weekday)
         for worker in self.shift[weekday]["worker"]:
             if worker["name"] == name:
-                if start is not None:
-                    worker["worktime"][index - 1]["start"] = start
-                if end is not None:
-                    worker["worktime"][index - 1]["end"] = end
+                worker["worktime"][index - 1]["start"] = worktime["start"]
+                worker["worktime"][index - 1]["end"] = worktime["end"]
         self.sort_by_starttime()
+
+    def add_request(self, weekday, name, index=1, requestedtime=None):
+        weekday = Shift.exchange_weekdayname(weekday)
+        for worker in self.shift[weekday]["worker"]:
+            if worker["name"] == name:
+                worker["worktime"][index - 1]["requested"] = {
+                    "start": (
+                        worker["worktime"][index - 1]["start"]
+                        if requestedtime is None
+                        else requestedtime["start"]
+                    ),
+                    "end": (
+                        worker["worktime"][index - 1]["end"]
+                        if requestedtime is None
+                        else requestedtime["end"]
+                    ),
+                }
+                break
+
+    def delete_request(self, weekday, name, index=1):
+        weekday = Shift.exchange_weekdayname(weekday)
+        for worker in self.shift[weekday]["worker"]:
+            if worker["name"] == name:
+                print(worker)
+                if "requested" in worker["worktime"][index - 1]:
+                    print("delete!")
+                    del worker["worktime"][index - 1]["requested"]
+                    break
 
 
 class DrawShiftImg:
@@ -320,10 +346,10 @@ class DrawShiftImg:
                             self.shift.shift[weekday]["worker"].index(worker)
                         ],
                     )
-                    if "代行依頼" in worktime:
-                        requestTime = Shift.count_worktime(worktime["代行依頼"])
+                    if "requested" in worktime:
+                        requestTime = Shift.count_worktime(worktime["requested"])
                         worktimePerDay -= requestTime
-                        apex = self.calc_rect_apices(worktime["代行依頼"], rowCounter)
+                        apex = self.calc_rect_apices(worktime["requested"], rowCounter)
                         self.drawObj.polygon(apex, self.LIGHT_GRAY)
 
                 else:
@@ -433,6 +459,9 @@ if __name__ == "__main__":
         "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
         "/Library/Fonts/Arial.ttf",
     )
+    make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
+    make.shift.delete_request("月", "松田")
+    make.update()
     image = make.makeImage()
     image.show()
 
