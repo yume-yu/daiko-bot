@@ -333,7 +333,7 @@ class drawShiftImg:
                         self.drawObj.polygon(apex, self.LIGHT_GRAY)
 
                 else:
-                    if timepos is "rect":
+                    if timepos == "rect":
                         # 最後の勤務の矩形の下に総勤務時間
                         self.drawObj.text(
                             (
@@ -346,7 +346,7 @@ class drawShiftImg:
                             textColor,
                             font,
                         )
-                    elif timepos is "name":
+                    elif timepos == "name":
                         # 名前の右下に総勤務時間
                         self.drawObj.text(
                             (
@@ -362,7 +362,7 @@ class drawShiftImg:
                             textColor,
                             font,
                         )
-                    elif timepos is "bottom":
+                    elif timepos == "bottom":
                         # 一番下の行に総勤務時間
                         self.drawObj.text(
                             (
