@@ -8,7 +8,7 @@ class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
 
     @staticmethod
-    def parse_shift_json(json_path):
+    def parse_json(json_path):
         shiftFile = open(json_path, "r")
         shift_dict = json.load(shiftFile)
         return shift_dict
@@ -47,7 +47,7 @@ class Shift:
         raise ValueError("invaild weekday text")
 
     def __init__(self, path):
-        self.shift = Shift.parse_shift_json(path)
+        self.shift = Shift.parse_json(path)
         self.sort_by_starttime()
 
     def sort_by_starttime(self):
