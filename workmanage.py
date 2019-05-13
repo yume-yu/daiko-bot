@@ -4,7 +4,97 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 
-class makeShiftImg:
+class Shift:
+    WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
+
+    @staticmethod
+    def parseShiftJson(json_path):
+        shiftFile = open(json_path, "r")
+        shift_dict = json.load(shiftFile)
+        return shift_dict
+
+    @staticmethod
+    def countWorktime(worktime, columnCount=False):
+        startTime = {
+            "hour": int(worktime["start"].split(":")[0]),
+            "minute": int(worktime["start"].split(":")[1]),
+        }
+        endTime = {
+            "hour": int(worktime["end"].split(":")[0]),
+            "minute": int(worktime["end"].split(":")[1]),
+        }
+        worktimeLangth = (endTime["hour"] - startTime["hour"]) + (
+            ((endTime["minute"] - startTime["minute"]) / 60)
+        )
+        if columnCount:
+            startColumn = (startTime["hour"] - 8) * 2 + (startTime["minute"] / 30)
+            return {"startColumn": startColumn, "columns": worktimeLangth * 2}
+        else:
+            return worktimeLangth
+
+    @staticmethod
+    def exchangeWeekdayname(weekday):
+        if weekday in (Shift.WORKDAYS[0], "月", "げつ", "Monday", "Mon"):
+            return Shift.WORKDAYS[0]
+        elif weekday in (Shift.WORKDAYS[1], "火", "か", "Tuesday", "Tue"):
+            return Shift.WORKDAYS[1]
+        elif weekday in (Shift.WORKDAYS[2], "水", "すい", "Wednesday", "Wed"):
+            return Shift.WORKDAYS[2]
+        elif weekday in (Shift.WORKDAYS[3], "木", "もく", "Thursday", "Thu"):
+            return Shift.WORKDAYS[3]
+        elif weekday in (Shift.WORKDAYS[4], "金", "きん", "Friday", "Fri"):
+            return Shift.WORKDAYS[4]
+        raise ValueError("invaild weekday text")
+
+    def __init__(self, path):
+        self.shift = Shift.parseShiftJson(path)
+        self.sortShiftByStartTime()
+
+    def sortShiftByStartTime(self):
+        for weekday in self.shift:
+            for worker in self.shift[weekday]["worker"]:
+                # worker["worktime"] =
+                worker["worktime"] = sorted(
+                    worker["worktime"], key=lambda x: x["start"]
+                )
+            self.shift[weekday]["worker"] = sorted(
+                self.shift[weekday]["worker"],
+                key=lambda x: (x["worktime"][0]["start"], x["worktime"][0]["end"]),
+            )
+
+    def addShift(self, weekday, name, worktime):
+        weekday = Shift.exchangeWeekdayname(weekday)
+        for worker in self.shift[weekday]["worker"]:
+            if worker["name"] == name:
+                worker["worktime"].append(worktime)
+                break
+        else:
+            newWorker = {"name": name, "worktime": [worktime]}
+            self.shift[weekday]["worker"].append(newWorker)
+
+        self.sortShiftByStartTime()
+
+    def delShift(self, weekday, name, index):
+        weekday = Shift.exchangeWeekdayname(weekday)
+        for worker in self.shift[weekday]["worker"]:
+            if worker["name"] == name:
+                del worker["worktime"][index - 1]
+                if not worker["worktime"]:
+                    self.shift[weekday]["worker"].remove(worker)
+        self.sortShiftByStartTime()
+
+    def updateShift(self, weekday, name, index, start=None, end=None):
+        weekday = Shift.exchangeWeekdayname(weekday)
+        for worker in self.shift[weekday]["worker"]:
+            if worker["name"] == name:
+                if start is not None:
+                    worker["worktime"][index - 1]["start"] = start
+                if end is not None:
+                    worker["worktime"][index - 1]["end"] = end
+        self.sortShiftByStartTime()
+
+
+class drawShiftImg:
 
     FOR_WIDTH_RATIO = 1624 / 38
     BLACK = (0, 0, 0)
@@ -26,35 +116,38 @@ class makeShiftImg:
     gridLineWeight = 1
     boldLineWeight = 3
 
-    @staticmethod
-    def parseShiftJson(json_path):
-        shiftFile = open(json_path, "r")
-        shift_dict = json.load(shiftFile)
-        return shift_dict
-
-    @staticmethod
-    def sortShiftByStartTime(shift):
-        for weekday in shift:
-            shift[weekday]["worker"] = sorted(
-                shift[weekday]["worker"], key=lambda x: x["worktime"][0]["start"]
-            )
-        return shift
-
-    def __init__(self, jsonFilePath, kanjiFontPath, fontPath=None):
+    def __init__(self, shift, kanjiFontPath, fontPath=None):
 
         if fontPath is None:
             fontPath = kanjiFontPath
 
-        self.shift = makeShiftImg.parseShiftJson(jsonFilePath)
-        self.shift = makeShiftImg.sortShiftByStartTime(self.shift)
+        self.shift = shift
         divWidth = self.countNeedShiftRow()  # シフトを挿入する列数
         self.needRows = divWidth + 4  # 表の余白分を含めた列数
         self.font = ImageFont.truetype(str(fontPath), 25)
         self.smallFont = ImageFont.truetype(str(fontPath), 15)
         self.kanjiFont = ImageFont.truetype(str(kanjiFontPath), 25)
-        self.width = int(makeShiftImg.FOR_WIDTH_RATIO * self.needRows)
-        self.height = makeShiftImg.HEIGHT
-        self.image = Image.new("RGB", (self.width, self.height), makeShiftImg.WHITE)
+        self.width = int(drawShiftImg.FOR_WIDTH_RATIO * self.needRows)
+        self.height = drawShiftImg.HEIGHT
+        self.image = Image.new("RGB", (self.width, self.height), drawShiftImg.WHITE)
+        self.drawObj = ImageDraw.Draw(self.image)
+        # 罫線を引くためのプロパティ
+        self.needColumns = 23  # 名前部分を除いた必要な列数
+        self.heightOffset = self.height / 8  # 上部の名前の空間の高さ
+        self.columnHeight = (
+            self.height - self.heightOffset
+        ) / self.needColumns  # 名前部分を以外の列の高さ
+        self.rowWidth = self.width / self.needRows  # 1列の幅
+
+    def updateShift(self, newshift=None):
+        if newshift is not None:
+            self.shift = newshift
+
+        divWidth = self.countNeedShiftRow()  # シフトを挿入する列数
+        self.needRows = divWidth + 4  # 表の余白分を含めた列数
+        self.width = int(drawShiftImg.FOR_WIDTH_RATIO * self.needRows)
+        self.height = drawShiftImg.HEIGHT
+        self.image = Image.new("RGB", (self.width, self.height), drawShiftImg.WHITE)
         self.drawObj = ImageDraw.Draw(self.image)
         # 罫線を引くためのプロパティ
         self.needColumns = 23  # 名前部分を除いた必要な列数
@@ -67,33 +160,15 @@ class makeShiftImg:
     def countNeedShiftRow(self, selectedWeekday=None):
         countedRows = 0
         if selectedWeekday is None:
-            for weekday in self.shift:
-                countedRows += len(self.shift[weekday]["worker"])
+            for weekday in self.shift.shift:
+                countedRows += len(self.shift.shift[weekday]["worker"])
             return countedRows
         else:
-            return len(self.shift[selectedWeekday]["worker"])
-
-    def countWorktime(self, worktime, columnCount=False):
-        startTime = {
-            "hour": int(worktime["start"].split(":")[0]),
-            "minute": int(worktime["start"].split(":")[1]),
-        }
-        endTime = {
-            "hour": int(worktime["end"].split(":")[0]),
-            "minute": int(worktime["end"].split(":")[1]),
-        }
-        worktimeLangth = (endTime["hour"] - startTime["hour"]) + (
-            ((endTime["minute"] - startTime["minute"]) / 60)
-        )
-        if columnCount:
-            startColumn = (startTime["hour"] - 8) * 2 + (startTime["minute"] / 30)
-            return {"startColumn": startColumn, "columns": worktimeLangth * 2}
-        else:
-            return worktimeLangth
+            return len(self.shift.shift[selectedWeekday]["worker"])
 
     def calculateApexPointsFromWorktime(self, worktime, row):
         points = []
-        worktimeColumn = self.countWorktime(worktime, columnCount=True)
+        worktimeColumn = Shift.countWorktime(worktime, columnCount=True)
         points.append(
             (
                 self.rowWidth * (2 + row),
@@ -187,7 +262,7 @@ class makeShiftImg:
             (0, 0, 0),
             lineWeight,
         )
-        for (weekday, loopCount) in zip(self.shift, range(len(self.shift))):
+        for (weekday, loopCount) in zip(self.shift.shift, range(len(self.shift.shift))):
             weekdayLabelPoint = (
                 self.rowWidth * (tmpCountRow + self.countNeedShiftRow(weekday) / 2)
                 - font.getsize(weekdayList[loopCount])[0] / 2,
@@ -212,8 +287,8 @@ class makeShiftImg:
         for (row, name) in enumerate(
             [
                 worker["name"]
-                for weekday in self.shift
-                for worker in self.shift[weekday]["worker"]
+                for weekday in self.shift.shift
+                for worker in self.shift.shift[weekday]["worker"]
             ]
         ):
             self.writeTextVerticalBottom(
@@ -236,19 +311,21 @@ class makeShiftImg:
         rowCounter = 0
         worktimePerDay = 0
         worktimeTextOffset = 3
-        for weekday in self.shift:
-            for worker in self.shift[weekday]["worker"]:
+        for weekday in self.shift.shift:
+            for worker in self.shift.shift[weekday]["worker"]:
                 for worktime in worker["worktime"]:
-                    worktimePerDay += self.countWorktime(worktime)
+                    worktimePerDay += Shift.countWorktime(worktime)
                     rectApex = self.calculateApexPointsFromWorktime(
                         worktime, rowCounter
                     )
                     self.drawObj.polygon(
                         rectApex,
-                        fill=colorTable[self.shift[weekday]["worker"].index(worker)],
+                        fill=colorTable[
+                            self.shift.shift[weekday]["worker"].index(worker)
+                        ],
                     )
                     if "代行依頼" in worktime:
-                        requestTime = self.countWorktime(worktime["代行依頼"])
+                        requestTime = Shift.countWorktime(worktime["代行依頼"])
                         worktimePerDay -= requestTime
                         apex = self.calculateApexPointsFromWorktime(
                             worktime["代行依頼"], rowCounter
@@ -356,11 +433,13 @@ class makeShiftImg:
 
 
 if __name__ == "__main__":
-    make = makeShiftImg(
-        "./shift.json",
+    shift = Shift("./shift.json")
+    make = drawShiftImg(
+        shift,
         "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
         "/Library/Fonts/Arial.ttf",
     )
     image = make.makeImage()
     image.show()
+
 # image.save("./sample.jpg", quality=95)
