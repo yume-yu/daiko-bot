@@ -119,6 +119,10 @@ class Shift:
                     del worker["worktime"][index - 1]["requested"]
                     break
 
+    def export(self, path: str):
+        exportfile = open(path, "w")
+        json.dump(self.shift, exportfile, indent=2, ensure_ascii=False)
+
 
 class DrawShiftImg:
 
@@ -462,6 +466,15 @@ if __name__ == "__main__":
     make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
     make.shift.delete_request("月", "松田")
     make.update()
+    image = make.makeImage()
+    image.show()
+    make.shift.export("./export.json")
+    shift = Shift("./export.json")
+    make = DrawShiftImg(
+        shift,
+        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        "/Library/Fonts/Arial.ttf",
+    )
     image = make.makeImage()
     image.show()
 
