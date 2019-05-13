@@ -74,7 +74,7 @@ class Shift:
 
         self.sort_by_starttime()
 
-    def delete(self, weekday, name, index):
+    def delete(self, weekday, name, index=1):
         weekday = Shift.exchange_weekdayname(weekday)
         for worker in self.shift[weekday]["worker"]:
             if worker["name"] == name:
@@ -83,7 +83,7 @@ class Shift:
                     self.shift[weekday]["worker"].remove(worker)
         self.sort_by_starttime()
 
-    def update(self, weekday, name, index, start=None, end=None):
+    def update(self, weekday, name, index=1, start=None, end=None):
         weekday = Shift.exchange_weekdayname(weekday)
         for worker in self.shift[weekday]["worker"]:
             if worker["name"] == name:
