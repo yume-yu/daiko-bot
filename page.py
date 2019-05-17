@@ -4,7 +4,7 @@ import json
 import os
 import urllib.parse
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 
 from workmanage import DrawShiftImg, Shift
 
@@ -36,13 +36,13 @@ def add_shift_page():
         or request.args.get("name")
         or request.args.get("worktime")
     ):
-        return "Error"
+        return redirect(url_for("root_page"))
     weekday = urllib.parse.unquote(request.args.get("weekday"))
     name = urllib.parse.unquote(request.args.get("name"))
     worktime = json.loads(urllib.parse.unquote(request.args.get("worktime")))
     print(weekday, name, worktime)
     shift.add(weekday, name, worktime)
-    return "status :Ok"
+    return redirect(url_for("root_page"))
 
 
-app.run(debug=True)
+app.run(debug=True, host="0.0.0.0")

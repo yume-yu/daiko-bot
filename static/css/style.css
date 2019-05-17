@@ -1,1 +1,168 @@
+html {
+  font-size: 10px;
+}
 
+header {
+  background-color: rgb(30	,35	,84	);
+}
+
+h1 {
+  font-size:  4rem;
+}
+
+h2 {
+  width:auto;
+  font-size:  3.5rem;
+  padding-bottom: 1.5rem;
+  padding-top :1.5rem;
+}
+
+header h1{
+  padding: 2.5rem 0 ;
+  margin-left : 7vw;
+  color: rgb(220,220,220);
+}
+
+main {
+  margin: 0 10vw;
+}
+
+main div div{
+  padding-left: 2.5rem;
+}
+
+form * {
+  margin: 5px 10px;
+}
+
+form label {
+  font-size: 2.5rem;
+}
+
+form select{
+  -webkit-appearance: none;
+  padding: .6em 1.4em .5em .8em;
+  display:block;
+  height:30%;
+  font-size: 1.6rem;
+}
+
+.container {
+  display:flex;
+  flex-wrap: wrap;
+}
+
+.space-around {
+  align-items: flex-start;
+  justify-content:space-around;
+}
+
+.vertical-items {
+  flex-direction: column;
+}
+
+.items-group{
+  width: 80vw;
+}
+
+.image-case {
+  overflow: auto;
+  max-width: 1160px;
+}
+
+.image-case img {
+  /*
+  max-height: 80vh;
+  max-width: 80vw;
+   */
+  height:70vh;
+  min-height: 500px;
+  max-height:750px;
+  /*border: 0.1rem solid gray;*/
+  overflow: auto;
+  margin: auto 0;
+}
+
+.hidden-item {
+  display: none;
+}
+
+.button-case {
+  display:inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding:0;
+  background-color : rgba(20,155,100,1);
+  text-align:center;
+  border-radius: 2rem;
+  margin: 2rem 0 0 0;
+  width: 45%;
+}
+
+.button-case a {
+  display: block;
+  cursor: pointer;
+  text-align: center;
+  padding: 0.7em 1.4em;
+  width: 100%;
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  user-select:none;
+  text-decoration:none;
+  margin:0;
+}
+
+.floatbox {
+  width: 500px;
+  height: 30vh;
+  position:absolute;
+  right: 0;
+  bottom:0;
+  background-color: white;
+  padding:3rem;
+  padding-bottom: 3rem;
+  border: 0.1rem solid black;
+  left: calc(50vw - 500px / 2);
+  top: calc(50vh - 30vh / 2);
+}
+
+.floatbox .items-group {
+    width:auto;
+    padding-left: 0;
+    height: 30%;
+}
+
+.floatbox .button-case {
+     width:45%;
+}
+
+.floatbox div.button-case:first-of-type{
+  background-color: gray;
+
+}
+
+
+@media screen and (max-width: 1024px) {
+  #shift-img-div {
+  }
+
+  .image-case {
+    margin-left: 2.5rem;
+  }
+  .image-case img {
+    max-height:none;
+  }
+  .button-case {
+    height: auto;
+    width:100%;
+  }
+  .floatbox {
+  width: 80vw;
+  height: 30vh;
+  max-width:500px;
+  max-height:500px;
+  position:absolute;
+  }
+
+}
