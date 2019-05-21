@@ -118,11 +118,7 @@ class Shift:
         raise ValueError("invaild weekday text")
 
     def __init__(self, mon, tue, wed, thu, fri):
-        self.mon = mon
-        self.tue = tue
-        self.wed = wed
-        self.thu = thu
-        self.fri = fri
+        self.shift = [mon, tue, wed, thu, fri]
         # self.shift = Shift.parse_json(path)
         # self.sort_by_starttime()
 
@@ -602,7 +598,8 @@ if __name__ == "__main__":
     fp = open("./shift.json", "r")
     shift_dict = json.load(fp)
     obj = json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
-    print(obj.mon[0].name)
+    for day in obj.shift:
+        print(day)
     # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
     # make.shift.delete_request("月", "松田")
     # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
