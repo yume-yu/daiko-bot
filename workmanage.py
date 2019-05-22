@@ -82,7 +82,7 @@ class Shift:
         """
         shiftFile = open(json_path, "r")
         shift_dict = json.load(shiftFile)
-        return shift_dict
+        return json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
 
     @staticmethod
     def count_worktime(worktime, columnCount=False):
@@ -120,18 +120,14 @@ class Shift:
     def __init__(self, mon, tue, wed, thu, fri):
         self.shift = [mon, tue, wed, thu, fri]
         # self.shift = Shift.parse_json(path)
-        # self.sort_by_starttime()
+        self.sort_by_starttime()
 
     def sort_by_starttime(self):
         for weekday in self.shift:
-            for worker in self.shift[weekday]["worker"]:
-                # worker["worktime"] =
-                worker["worktime"] = sorted(
-                    worker["worktime"], key=lambda x: x["start"]
-                )
-            self.shift[weekday]["worker"] = sorted(
-                self.shift[weekday]["worker"],
-                key=lambda x: (x["worktime"][0]["start"], x["worktime"][0]["end"]),
+            for worker in weekday:
+                worker.worktime = sorted(worker.worktime, key=lambda x: x.start)
+            weekday = sorted(
+                weekday, key=lambda x: (x.worktime[0].start, x.worktime[0].end)
             )
 
     def add(self, weekday, name, worktime):
@@ -588,6 +584,10 @@ class DrawShiftImg:
 
 if __name__ == "__main__":
 
+    obj = Shift.parse_json("./shift.json")
+    for item in obj.shift:
+        for day in item:
+            print(day.worktime[0].start)
     # shift = Shift("./shift.json")
     # make = DrawShiftImg(
     #     shift,
@@ -595,11 +595,6 @@ if __name__ == "__main__":
     #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
     #     "/Library/Fonts/Arial.ttf",
     # )
-    fp = open("./shift.json", "r")
-    shift_dict = json.load(fp)
-    obj = json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
-    for day in obj.shift:
-        print(day)
     # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
     # make.shift.delete_request("月", "松田")
     # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
