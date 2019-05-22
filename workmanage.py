@@ -86,22 +86,12 @@ class Shift:
 
     @staticmethod
     def count_worktime(worktime, columnCount=False):
-        startTime = {
-            "hour": int(worktime["start"].split(":")[0]),
-            "minute": int(worktime["start"].split(":")[1]),
-        }
-        endTime = {
-            "hour": int(worktime["end"].split(":")[0]),
-            "minute": int(worktime["end"].split(":")[1]),
-        }
-        worktimeLangth = (endTime["hour"] - startTime["hour"]) + (
-            ((endTime["minute"] - startTime["minute"]) / 60)
-        )
+        delta = worktime.end - worktime.start
+        hour = int(delta.seconds) / 3600
         if columnCount:
-            startColumn = (startTime["hour"] - 8) * 2 + (startTime["minute"] / 30)
-            return {"startColumn": startColumn, "columns": worktimeLangth * 2}
+            return hour * 2
         else:
-            return worktimeLangth
+            return hour
 
     @staticmethod
     def exchange_weekdayname(weekday):
@@ -587,7 +577,8 @@ if __name__ == "__main__":
     obj = Shift.parse_json("./shift.json")
     for item in obj.shift:
         for day in item:
-            print(day.worktime[0].start)
+            print(day.worktime[0].start, day.worktime[0].end)
+            print(Shift.count_worktime(day.worktime[0]))
     # shift = Shift("./shift.json")
     # make = DrawShiftImg(
     #     shift,
