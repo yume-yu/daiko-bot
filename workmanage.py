@@ -46,7 +46,7 @@ class Worker:
     def __init__(self, name, times):
         """
         :param str name : 働く人の名前。
-        :param times: その人が働く時間。[["HH:MM","HH:MM"], ...]
+        :param times: その人が働く時間。Worktimeオブジェクトのリスト
         """
         self.name = name
         self.worktime = times
@@ -109,28 +109,35 @@ class Shift:
 
     def __init__(self, mon, tue, wed, thu, fri):
         self.shift = [mon, tue, wed, thu, fri]
-        # self.shift = Shift.parse_json(path)
         self.sort_by_starttime()
 
     def sort_by_starttime(self):
-        for weekday in self.shift:
-            for worker in weekday:
+        for (weekdayindex, workers) in enumerate(self.shift):
+            for worker in workers:
                 worker.worktime = sorted(worker.worktime, key=lambda x: x.start)
-            weekday = sorted(
-                weekday, key=lambda x: (x.worktime[0].start, x.worktime[0].end)
+            self.shift[weekdayindex] = sorted(
+                workers,
+                key=lambda worker: (worker.worktime[0].start, worker.worktime[0].end),
             )
 
     def add(self, weekday, name, worktime):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"].append(worktime)
+        """
+        :param str weekday : 追加するシフトの曜日。
+        :param str name : 働く人の名前。
+        :param times: 追加するシフトの時間。["HH:MM","HH:MM"]
+        """
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                worker.worktime.append(Worktime(worktime[0], worktime[1]))
                 break
         else:
-            newWorker = {"name": name, "worktime": [worktime]}
-            self.shift[weekday]["worker"].append(newWorker)
+            newWorker = Worker(
+                name, (Worktime(times[0], times[1]) for times in worktime)
+            )
+            print(vars(newWorker))
+            self.shift[weekdayindex].append(newWorker)
         self.sort_by_starttime()
-        print(self.shift[weekday])
 
     def delete(self, weekday, name, index=1):
         weekday = Shift.exchange_weekdayname(weekday)
@@ -575,25 +582,26 @@ class DrawShiftImg:
 if __name__ == "__main__":
 
     obj = Shift.parse_json("./shift.json")
+    obj.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
     for item in obj.shift:
         for day in item:
-            print(day.worktime[0].start, day.worktime[0].end)
-            print(Shift.count_worktime(day.worktime[0]))
-    # shift = Shift("./shift.json")
-    # make = DrawShiftImg(
-    #     shift,
-    #     "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-    #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
-    #     "/Library/Fonts/Arial.ttf",
-    # )
-    # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
-    # make.shift.delete_request("月", "松田")
-    # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
-    # make.update()
-    # image = make.makeImage()
-    # image.show()
-    # make.shift.export("./export.json")
-    # make.update()
-    # image = make.makeImage()
-    # image.show()
-    # image.save("./sample.jpg", quality=95)
+            for worktime in day.worktime:
+                print(day.name, worktime.start, worktime.end)
+        # shift = Shift("./shift.json")
+        # make = DrawShiftImg(
+        #     shift,
+        #     "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
+        #     "/Library/Fonts/Arial.ttf",
+        # )
+        # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
+        # make.shift.delete_request("月", "松田")
+        # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
+        # make.update()
+        # image = make.makeImage()
+        # image.show()
+        # make.shift.export("./export.json")
+        # make.update()
+        # image = make.makeImage()
+        # image.show()
+        # image.save("./sample.jpg", quality=95)
