@@ -140,12 +140,12 @@ class Shift:
         self.sort_by_starttime()
 
     def delete(self, weekday, name, index=1):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                del worker["worktime"][index - 1]
-                if not worker["worktime"]:
-                    self.shift[weekday]["worker"].remove(worker)
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                del worker.worktime[index - 1]
+                if not worker.worktime:
+                    self.shift[weekdayindex].remove(worker)
         self.sort_by_starttime()
 
     def update(self, weekday, name, worktime, index=1):
@@ -583,6 +583,8 @@ if __name__ == "__main__":
 
     obj = Shift.parse_json("./shift.json")
     obj.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
+    obj.delete("mon", "新宮", 1)
+    obj.delete("mon", "新宮", 1)
     for item in obj.shift:
         for day in item:
             for worktime in day.worktime:
