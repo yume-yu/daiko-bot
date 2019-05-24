@@ -5,11 +5,10 @@ import os
 import urllib.parse
 
 from flask import Flask, redirect, render_template, request, url_for
-
 from workmanage import DrawShiftImg, Shift
 
 app = Flask(__name__)
-shift = Shift("./shift.json")
+shift = Shift.parse_json("./shift.json")
 
 
 @app.route("/")
