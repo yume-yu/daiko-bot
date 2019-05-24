@@ -261,10 +261,13 @@ class DrawShiftImg:
         countedRows = 0
         if selectedWeekday is None:
             for weekday in self.shift.shift:
-                countedRows += len(self.shift.shift[weekday]["worker"])
+                countedRows += len(weekday)
             return countedRows
         else:
-            return len(self.shift.shift[selectedWeekday]["worker"])
+            weekdayindex = Shift.WORKDAYS.index(
+                Shift.exchange_weekdayname(selectedWeekday)
+            )
+            return len(self.shift.shift[weekdayindex])
 
     def calc_rect_apices(self, worktime, row):
         points = []
@@ -585,28 +588,28 @@ class DrawShiftImg:
 
 
 if __name__ == "__main__":
-    obj = Shift.parse_json("./shift.json")
-    obj.update("mon", "松田", ["9:00", "12:00"])
-    obj.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
-    obj.delete("mon", "新宮", 1)
-    obj.delete("mon", "新宮", 1)
-    for item in obj.shift:
+    shift = Shift.parse_json("./shift.json")
+    shift.update("mon", "松田", ["9:00", "12:00"])
+    shift.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
+    shift.delete("mon", "新宮", 1)
+    shift.delete("mon", "新宮", 1)
+    for item in shift.shift:
         for day in item:
             for worktime in day.worktime:
                 print(day.name, worktime.start, worktime.end)
     # shift = Shift("./shift.json")
-    # make = DrawShiftImg(
-    #     shift,
-    #     "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-    #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
-    #     "/Library/Fonts/Arial.ttf",
-    # )
+    make = DrawShiftImg(
+        shift,
+        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
+        "/Library/Fonts/Arial.ttf",
+    )
     # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
     # make.shift.delete_request("月", "松田")
     # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
     # make.update()
-    # image = make.makeImage()
-    # image.show()
+    image = make.makeImage()
+    image.show()
     # make.shift.export("./export.json")
     # make.update()
     # image = make.makeImage()
