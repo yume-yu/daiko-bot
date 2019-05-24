@@ -89,9 +89,15 @@ class Shift:
         delta = worktime.end - worktime.start
         hour = int(delta.seconds) / 3600
         if columnCount:
-            return hour * 2
+            diff9th = worktime.start - datetime.timedelta(hours=8)
+            # diff9th = worktime.start - (worktime.start - datetime.timedelta(hours=9))
+            print(diff9th)
+            startColumn = (
+                int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
+            )
+            return {"startColumn": startColumn, "columns": hour * 2}
         else:
-            return hour
+            return hour * 2
 
     @staticmethod
     def exchange_weekdayname(weekday):
@@ -264,10 +270,7 @@ class DrawShiftImg:
                 countedRows += len(weekday)
             return countedRows
         else:
-            weekdayindex = Shift.WORKDAYS.index(
-                Shift.exchange_weekdayname(selectedWeekday)
-            )
-            return len(self.shift.shift[weekdayindex])
+            return len(selectedWeekday)
 
     def calc_rect_apices(self, worktime, row):
         points = []
@@ -432,11 +435,7 @@ class DrawShiftImg:
         """
         nameBottomOfiiset = 20
         for (row, name) in enumerate(
-            [
-                worker["name"]
-                for day in self.shift.shift
-                for worker in self.shift.shift[day]["worker"]
-            ]
+            [worker.name for day in self.shift.shift for worker in day]
         ):
             """
               if day == weekday:
@@ -471,17 +470,14 @@ class DrawShiftImg:
         worktimePerDay = 0
         worktimeTextOffset = 3
         for weekday in self.shift.shift:
-            for worker in self.shift.shift[weekday]["worker"]:
-                for worktime in worker["worktime"]:
+            for worker in weekday:
+                for worktime in worker.worktime:
                     worktimePerDay += Shift.count_worktime(worktime)
                     rectApex = self.calc_rect_apices(worktime, rowCounter)
                     self.drawObj.polygon(
-                        rectApex,
-                        fill=colorTable[
-                            self.shift.shift[weekday]["worker"].index(worker)
-                        ],
+                        rectApex, fill=colorTable[weekday.index(worker)]
                     )
-                    if "requested" in worktime:
+                    if worktime.requested is not None:
                         requestTime = Shift.count_worktime(worktime["requested"])
                         worktimePerDay -= requestTime
                         apex = self.calc_rect_apices(worktime["requested"], rowCounter)
@@ -596,7 +592,7 @@ if __name__ == "__main__":
     for item in shift.shift:
         for day in item:
             for worktime in day.worktime:
-                print(day.name, worktime.start, worktime.end)
+                print()
     # shift = Shift("./shift.json")
     make = DrawShiftImg(
         shift,
