@@ -151,6 +151,14 @@ class Shift:
         self.shift = [mon, tue, wed, thu, fri]
         self.sort_by_starttime()
 
+    def get_member(self):
+        menbers = []
+        for day in self.shift:
+            for worker in day:
+                if worker.name not in menbers:
+                    menbers.append(worker.name)
+        return menbers
+
     def sort_by_starttime(self):
         for (weekdayindex, workers) in enumerate(self.shift):
             for worker in workers:

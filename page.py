@@ -46,6 +46,11 @@ def add_shift_page():
     return redirect(url_for("root_page"))
 
 
+@app.route("/_get_members")
+def return_member():
+    return jsonify(shift.get_member())
+
+
 @app.route("/_get_week")
 def return_json():
     return jsonify(ast.literal_eval(str(shift)))  # 文字列→dict→jsonに変換して返す
