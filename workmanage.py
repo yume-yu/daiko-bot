@@ -124,7 +124,7 @@ class Shift:
         """
         :param str weekday : 追加するシフトの曜日。
         :param str name : 働く人の名前。
-        :param times: 追加するシフトの時間。["HH:MM","HH:MM"]
+        :param worktimes: 追加するシフトの時間。["HH:MM","HH:MM"]
         """
         weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
         for worker in self.shift[weekdayindex]:
@@ -148,12 +148,17 @@ class Shift:
                     self.shift[weekdayindex].remove(worker)
         self.sort_by_starttime()
 
-    def update(self, weekday, name, worktime, index=1):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"][index - 1]["start"] = worktime["start"]
-                worker["worktime"][index - 1]["end"] = worktime["end"]
+    def update(self, weekday, name, time, index=1):
+        """
+        :param str weekday : 追加するシフトの曜日。
+        :param str name : 働く人の名前。
+        :param time: 修正後のシフトの時間。["HH:MM","HH:MM"]
+        :param index: 修正するシフトがその日の何番目か
+        """
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                worker.worktime[index - 1].update(time[0], time[1])
         self.sort_by_starttime()
 
     def add_request(self, weekday, name, index=1, requestedtime=None):
@@ -580,8 +585,8 @@ class DrawShiftImg:
 
 
 if __name__ == "__main__":
-
     obj = Shift.parse_json("./shift.json")
+    obj.update("mon", "松田", ["9:00", "12:00"])
     obj.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
     obj.delete("mon", "新宮", 1)
     obj.delete("mon", "新宮", 1)
@@ -589,21 +594,21 @@ if __name__ == "__main__":
         for day in item:
             for worktime in day.worktime:
                 print(day.name, worktime.start, worktime.end)
-        # shift = Shift("./shift.json")
-        # make = DrawShiftImg(
-        #     shift,
-        #     "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-        #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
-        #     "/Library/Fonts/Arial.ttf",
-        # )
-        # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
-        # make.shift.delete_request("月", "松田")
-        # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
-        # make.update()
-        # image = make.makeImage()
-        # image.show()
-        # make.shift.export("./export.json")
-        # make.update()
-        # image = make.makeImage()
-        # image.show()
-        # image.save("./sample.jpg", quality=95)
+    # shift = Shift("./shift.json")
+    # make = DrawShiftImg(
+    #     shift,
+    #     "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+    #     "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
+    #     "/Library/Fonts/Arial.ttf",
+    # )
+    # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
+    # make.shift.delete_request("月", "松田")
+    # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
+    # make.update()
+    # image = make.makeImage()
+    # image.show()
+    # make.shift.export("./export.json")
+    # make.update()
+    # image = make.makeImage()
+    # image.show()
+    # image.save("./sample.jpg", quality=95)
