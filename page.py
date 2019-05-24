@@ -1,14 +1,17 @@
+import ast
 import datetime
 import glob
 import json
 import os
 import urllib.parse
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 from workmanage import DrawShiftImg, Shift
 
 app = Flask(__name__)
-shift = Shift.parse_json("./shift.json")
+app.config["JSON_AS_ASCII"] = False
+# shift = Shift.parse_json("./shift.json")
+shift = Shift.parse_json("./sample.json")
 
 
 @app.route("/")
@@ -39,9 +42,13 @@ def add_shift_page():
     weekday = urllib.parse.unquote(request.args.get("weekday"))
     name = urllib.parse.unquote(request.args.get("name"))
     worktime = json.loads(urllib.parse.unquote(request.args.get("worktime")))
-    print(weekday, name, worktime)
     shift.add(weekday, name, worktime)
     return redirect(url_for("root_page"))
+
+
+@app.route("/_get_week")
+def return_json():
+    return jsonify(ast.literal_eval(str(shift)))  # 文字列→dict→jsonに変換して返す
 
 
 app.run(debug=True, host="0.0.0.0")
