@@ -5,6 +5,20 @@ from PIL import Image, ImageDraw, ImageFont
 
 
 class Worktime:
+    def _str__(self):
+        return_str = f"start:{0} end:{1} requested:{2}".format(
+            self.start, self.end, self.requested
+        )
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {
+            "start": self.start.strftime("%H:%M"),
+            "end": self.end.strftime("%H:%M"),
+            "requested": self.requested,
+        }
+        return str(obj_dict)
+
     def __init__(self, start, end):
         """
         :param str start : シフトの開始時刻。HH:MMで書く。
@@ -43,6 +57,14 @@ class Worktime:
 
 
 class Worker:
+    def _str__(self):
+        return_str = f"name:{0} worktime:{1}".format(self.name, self.worktime)
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {"name": self.name, "worktime": self.worktime}
+        return str(obj_dict)
+
     def __init__(self, name, times):
         """
         :param str name : 働く人の名前。
@@ -54,6 +76,19 @@ class Worker:
 
 class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
+
+    def _str__(self):
+        return_str = ""
+        for (weekdayindex, day) in enumerate(self.shift):
+            return_str += "{0} : {1},".format(Shift.WORKDAYS[weekdayindex], day)
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {
+            Shift.WORKDAYS[weekdayindex]: day
+            for (weekdayindex, day) in enumerate(self.shift)
+        }
+        return str(obj_dict)
 
     @staticmethod
     def hook(dct):
@@ -91,7 +126,6 @@ class Shift:
         if columnCount:
             diff9th = worktime.start - datetime.timedelta(hours=8)
             # diff9th = worktime.start - (worktime.start - datetime.timedelta(hours=9))
-            print(diff9th)
             startColumn = (
                 int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
             )
@@ -141,7 +175,6 @@ class Shift:
             newWorker = Worker(
                 name, (Worktime(times[0], times[1]) for times in worktime)
             )
-            print(vars(newWorker))
             self.shift[weekdayindex].append(newWorker)
         self.sort_by_starttime()
 
@@ -373,7 +406,7 @@ class DrawShiftImg:
         tmpCountRow = 2  # 両サイド2列分開いてるからoffset
         weekdayList = ("月", "火", "水", "木", "金")
         if weekday is None:
-            weekday = datetime.datetime.now().strftime("%a")
+            weekday = "mon"
         weekday = Shift.exchange_weekdayname(weekday)
         self.drawObj.line(
             [(self.rowWidth * 2, 0), (self.rowWidth * 2, self.height)],
@@ -591,8 +624,9 @@ if __name__ == "__main__":
     shift.delete("mon", "新宮", 1)
     for item in shift.shift:
         for day in item:
-            for worktime in day.worktime:
-                print()
+            print(day)
+            # for worktime in day.worktime:
+    print(shift)
     # shift = Shift("./shift.json")
     make = DrawShiftImg(
         shift,
