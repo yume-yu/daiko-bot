@@ -61,13 +61,13 @@ def return_shift_of_member():
     # )
     elif request.method == "POST":
         if request.json is not None:
-            return str(
-                shift.get_shift_of_member(urllib.parse.unquote(request.json["name"]))
-            )
+            item = shift.get_shift_of_member(urllib.parse.unquote(request.json["name"]))
+            print(item)
+            return jsonify(item)
         else:
-            return str(
-                shift.get_shift_of_member(urllib.parse.unquote(request.form["name"]))
-            )
+            item = shift.get_shift_of_member(urllib.parse.unquote(request.form["name"]))
+            print(type(item))
+            return item
     else:
         return "wrong"
 

@@ -55,6 +55,13 @@ class Worktime:
         """
         self.requested = Worktime(start, end)
 
+    def to_dict(self):
+        return_dict = {
+            "start": self.start.strftime("%H:%M"),
+            "end": self.end.strftime("%H:%M"),
+        }
+        return return_dict
+
 
 class Worker:
     def _str__(self):
@@ -167,7 +174,11 @@ class Shift:
                 if worker.name == name:
                     print(worker)
                     shift_list.append(
-                        {Shift.WORKDAYS_JP[self.shift.index(day)]: worker.worktime}
+                        {
+                            Shift.WORKDAYS_JP[self.shift.index(day)]: [
+                                time.to_dict() for time in worker.worktime
+                            ]
+                        }
                     )
         return shift_list
 
