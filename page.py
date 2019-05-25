@@ -51,6 +51,27 @@ def return_member():
     return jsonify(shift.get_member())
 
 
+@app.route("/_get_of_member", methods=["GET", "POST"])
+def return_shift_of_member():
+    # return jsonify(
+    if request.method == "GET":
+        return str(
+            shift.get_shift_of_member(urllib.parse.unquote(request.args.get("name")))
+        )
+    # )
+    elif request.method == "POST":
+        if request.json is not None:
+            return str(
+                shift.get_shift_of_member(urllib.parse.unquote(request.json["name"]))
+            )
+        else:
+            return str(
+                shift.get_shift_of_member(urllib.parse.unquote(request.form["name"]))
+            )
+    else:
+        return "wrong"
+
+
 @app.route("/_get_week", methods=["GET"])
 def return_json():
     return jsonify(ast.literal_eval(str(shift)))  # 文字列→dict→jsonに変換して返す

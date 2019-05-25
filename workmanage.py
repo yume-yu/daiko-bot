@@ -76,6 +76,7 @@ class Worker:
 
 class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
+    WORKDAYS_JP = ("月", "火", "水", "木", "金")
 
     def _str__(self):
         return_str = ""
@@ -158,6 +159,17 @@ class Shift:
                 if worker.name not in menbers:
                     menbers.append(worker.name)
         return menbers
+
+    def get_shift_of_member(self, name):
+        shift_list = []
+        for day in self.shift:
+            for worker in day:
+                if worker.name == name:
+                    print(worker)
+                    shift_list.append(
+                        {Shift.WORKDAYS_JP[self.shift.index(day)]: worker.worktime}
+                    )
+        return shift_list
 
     def sort_by_starttime(self):
         for (weekdayindex, workers) in enumerate(self.shift):
@@ -626,15 +638,16 @@ class DrawShiftImg:
 
 if __name__ == "__main__":
     shift = Shift.parse_json("./shift.json")
-    shift.update("mon", "松田", ["9:00", "12:00"])
-    shift.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
-    shift.delete("mon", "新宮", 1)
-    shift.delete("mon", "新宮", 1)
+    # shift.update("mon", "松田", ["9:00", "12:00"])
+    # shift.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
+    # shift.delete("mon", "新宮", 1)
+    # shift.delete("mon", "新宮", 1)
     for item in shift.shift:
         for day in item:
             print(day)
             # for worktime in day.worktime:
-    print(shift)
+    print(shift.get_shift_of_member("熊田"))
+    # print(shift)
     # shift = Shift("./shift.json")
     make = DrawShiftImg(
         shift,
