@@ -37,9 +37,10 @@ select_list_name[0].addEventListener("change",function(){
       for(var item in json){
         // console.log(Object.keys(json[item]))
         // console.log(json[item])
-        for(var time in item){
+        for(var time in json[item][Object.keys(json[item])]){
           //console.log(json[item][Object.keys(json[item])][time])
           var temp_option = document.createElement('option')
+          console.log(Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])][time]["start"] + "~" + json[item][Object.keys(json[item])][time]["end"])
           temp_option.textContent = Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])][time]["start"] + "~" + json[item][Object.keys(json[item])][time]["end"]
           temp_option.value = item+ ":" + time
           select_list_name[1].appendChild(temp_option)
