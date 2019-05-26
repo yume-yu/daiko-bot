@@ -25,7 +25,8 @@
           <div class="button-case"><a id="contract">代行請負</a></div>
         </div>
       </div>
-      <div id="requestWindow" class="items-group floatbox hidden-item">
+      <div id="window" class="items-group floatbox hidden-item vertical-items container space-around">
+        <div id="request-form" class="hidden-item">
         <form class="container">
           <h2>代行依頼</h2>
           <label>名前 : </label>
@@ -36,11 +37,21 @@
           <select required>
             <option value="">選択してください</option>
           </select>
+        </form>
+        </div>
+        <div id="contract-form" class="hidden-item">
+        <form class="container">
+          <h2>代行請負</h2>
+          <label>シフト : </label>
+          <select required>
+            <option value="">選択してください</option>
+          </select>
+        </form>
+        </div>
           <div class="container space-around">
             <div class="button-case"><a id="cancel">キャンセル</a></div>
             <div class="button-case"><a id="submit">送信</a></div>
           </div>
-        </form>
       </div>
     </main>
     <script type="text/javascript" src="static/js/script.js"></script>
