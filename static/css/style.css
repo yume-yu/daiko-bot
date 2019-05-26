@@ -28,11 +28,11 @@ main {
 }
 
 main div div{
-  padding-left: 2.5rem;
 }
 
 form * {
   margin: 5px 10px;
+  width: calc(100% - 2 * 10px);
 }
 
 form label {
@@ -43,7 +43,7 @@ form select{
   -webkit-appearance: none;
   padding: .6em 1.4em .5em .8em;
   display:block;
-  height:30%;
+  height:5rem;
   font-size: 1.6rem;
 }
 
@@ -68,6 +68,7 @@ form select{
 .image-case {
   overflow: auto;
   max-width: 1160px;
+  padding-left: 2.5rem;
 }
 
 .image-case img {
@@ -115,7 +116,7 @@ form select{
 
 .floatbox {
   width: 500px;
-  height: 30vh;
+  height: 400px;
   position:absolute;
   right: 0;
   bottom:0;
@@ -128,7 +129,6 @@ form select{
 }
 
 .floatbox .items-group {
-    width:auto;
     padding-left: 0;
     height: 30%;
 }
@@ -142,6 +142,9 @@ form select{
 
 }
 
+#requestWindow form{
+  height: 100%;
+}
 
 @media screen and (max-width: 1024px) {
   #shift-img-div {
@@ -159,7 +162,7 @@ form select{
   }
   .floatbox {
   width: 80vw;
-  height: 30vh;
+  height: 400px;
   max-width:500px;
   max-height:500px;
   position:absolute;

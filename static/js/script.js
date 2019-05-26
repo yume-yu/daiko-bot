@@ -1,9 +1,17 @@
 let requestbutton = document.getElementById("request");
 let constractbutton = document.getElementById("constract");
+let cancelbutton = document.getElementById("cancel");
 let select_list_name = document.getElementById("requestWindow").getElementsByTagName("select")
-requestbutton.addEventListener("click",function(){
+
+function toggle_window(){
   document.getElementById("requestWindow").classList.toggle("hidden-item")
-},false)
+  select_list_name[1].selectedIndex = 0
+  select_list_name[0].selectedIndex = 0
+}
+
+requestbutton.addEventListener("click",toggle_window,false)
+cancelbutton.addEventListener("click",toggle_window,false)
+
 fetch("_get_members").then(function(response){
   return response.json();
 }).then(function(json){
