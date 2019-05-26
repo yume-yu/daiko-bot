@@ -10,8 +10,8 @@ from workmanage import DrawShiftImg, Shift
 
 app = Flask(__name__)
 app.config["JSON_AS_ASCII"] = False
-shift = Shift.parse_json("./shift.json")
-# shift = Shift.parse_json("./sample.json")
+# shift = Shift.parse_json("./shift.json")
+shift = Shift.parse_json("./sample.json")
 
 
 @app.route("/")
