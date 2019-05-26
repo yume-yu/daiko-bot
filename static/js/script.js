@@ -9,6 +9,7 @@ function toggle_window(){
   request_list[1].selectedIndex = 0
   request_list[0].selectedIndex = 0
   contract_list[0].selectedIndex = 0
+  contract_list[1].selectedIndex = 0
 }
 
 function active_request(){
