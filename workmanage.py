@@ -232,12 +232,14 @@ class Shift:
         self.sort_by_starttime()
 
     def add_request(self, weekday, name, index=1, requestedtime=None):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"][index - 1]["requested"] = {
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                if requestedtime is None:
+                    worker.worktime[index - 1].requested = worker.worktime
+                """
+                worker.worktime[index - 1]["requested"] = {
                     "start": (
-                        worker["worktime"][index - 1]["start"]
                         if requestedtime is None
                         else requestedtime["start"]
                     ),
@@ -247,6 +249,7 @@ class Shift:
                         else requestedtime["end"]
                     ),
                 }
+                """
                 break
 
     def delete_request(self, weekday, name, index=1):
