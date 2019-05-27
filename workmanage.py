@@ -24,8 +24,14 @@ class Worktime:
         :param str start : シフトの開始時刻。HH:MMで書く。
         :param str end : シフトの終了時刻。HH:MMで書く。
         """
-        self.start = datetime.datetime.strptime(start, "%H:%M")
-        self.end = datetime.datetime.strptime(end, "%H:%M")
+        if type(start) is str:
+            self.start = datetime.datetime.strptime(start, "%H:%M")
+        elif type(start) is datetime.datetime:
+            self.start = start
+        if type(end) is str:
+            self.end = datetime.datetime.strptime(end, "%H:%M")
+        elif type(end) is datetime.datetime:
+            self.end = end
         self.requested = None
 
     def update_start(self, start):
@@ -236,20 +242,20 @@ class Shift:
         for worker in self.shift[weekdayindex]:
             if worker.name == name:
                 if requestedtime is None:
-                    worker.worktime[index - 1].requested = worker.worktime
-                """
-                worker.worktime[index - 1]["requested"] = {
-                    "start": (
-                        if requestedtime is None
-                        else requestedtime["start"]
-                    ),
-                    "end": (
-                        worker["worktime"][index - 1]["end"]
-                        if requestedtime is None
-                        else requestedtime["end"]
-                    ),
-                }
-                """
+                    worker.worktime[index - 1].requested = Worktime(
+                        worker.worktime[index - 1].start, worker.worktime[index - 1].end
+                    )
+                    # worker.worktime[index - 1]["requested"] = {
+                    #     "start": (
+                    #         if requestedtime is None
+                    #         else requestedtime["start"]
+                    #     ),
+                    #     "end": (
+                    #         worker["worktime"][index - 1]["end"]
+                    #         if requestedtime is None
+                    #         else requestedtime["end"]
+                    #     ),
+                    # }
                 break
 
     def delete_request(self, weekday, name, index=1):
@@ -545,9 +551,9 @@ class DrawShiftImg:
                         rectApex, fill=colorTable[weekday.index(worker)]
                     )
                     if worktime.requested is not None:
-                        requestTime = Shift.count_worktime(worktime["requested"])
+                        requestTime = Shift.count_worktime(worktime.requested)
                         worktimePerDay -= requestTime
-                        apex = self.calc_rect_apices(worktime["requested"], rowCounter)
+                        apex = self.calc_rect_apices(worktime.requested, rowCounter)
                         self.drawObj.polygon(apex, self.LIGHT_GRAY)
 
                 else:
