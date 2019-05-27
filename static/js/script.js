@@ -28,15 +28,21 @@ requestbutton.addEventListener("click",active_request,false)
 constractbutton.addEventListener("click",active_contract,false)
 cancelbutton.addEventListener("click",toggle_window,false)
 
+let members_json;
 fetch("_get_members").then(function(response){
   return response.json();
 }).then(function(json){
+  members_json = json
   for(var item in json){
     var temp_option = document.createElement('option')
     temp_option.textContent = json[item];
-    request_list[0].appendChild(temp_option)
+    request_list[0].appendChild(temp_option.cloneNode(true))
+    temp_option = document.createElement('option')
+    temp_option.textContent = json[item];
+    contract_list[0].appendChild(temp_option.cloneNode(true))
   }
 })
+
 request_list[0].addEventListener("change",function(){
   //子要素を全て削除
   for(var item in [...Array(request_list[1].children.length).keys()]){
