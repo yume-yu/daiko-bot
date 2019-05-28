@@ -9,10 +9,10 @@ let contract_list = document.getElementById("contract-form").getElementsByTagNam
 
 function toggle_window(){
   document.getElementById("window").classList.toggle("hidden-item")
-  request_list[1].selectedIndex = 0
-  request_list[0].selectedIndex = 0
-  contract_list[0].selectedIndex = 0
-  contract_list[1].selectedIndex = 0
+  request_list._shift.selectedIndex = 0
+  request_list._name.selectedIndex = 0
+  contract_list._yourname.selectedIndex = 0
+  contract_list._requested.selectedIndex = 0
 }
 
 function active_request(){
@@ -29,7 +29,7 @@ function active_contract(){
 
 function send_request(){
   fetch("_get_of_member",{method:"post",headers : { "content-type" : "application/json; charset=utf-8" },
-    body : JSON.stringify({name: request_list[0].value})}).then(function(response){
+    body : JSON.stringify({name: request_list._name.value})}).then(function(response){
       return response.json()
     }).then(function(json){
       let shift = json
@@ -62,15 +62,14 @@ function send_contract(){
 }
 
 function send_date(){
-  console.log(request_list[1].selectedIndex,contract_list[1].selectedIndex)
-  if (request_list[1].selectedIndex + contract_list[1].selectedIndex == 0){
+  if (request_list._shift.selectedIndex + contract_list._yourname.selectedIndex == 0){
     console.log("pass")
-  }else if(request_list[1].selectedIndex * contract_list[1].selectedIndex != 0){
+  }else if(request_list._shift.selectedIndex * contract_list._yourname.selectedIndex != 0){
     console.log("pass")
-  }else if(request_list[1].selectedIndex != 0){
+  }else if(request_list._shift.selectedIndex != 0){
     //代行依頼送信
     send_request()
-  }else if(contract_list[1].selectedIndex != 0){
+  }else if(contract_list._yourname.selectedIndex != 0){
     send_contract()
   }
 }
@@ -87,25 +86,25 @@ fetch("_get_members").then(function(response){
   for(var item in json){
     var temp_option = document.createElement('option')
     temp_option.textContent = json[item];
-    request_list[0].appendChild(temp_option.cloneNode(true))
+    request_list._name.appendChild(temp_option.cloneNode(true))
     temp_option = document.createElement('option')
     temp_option.textContent = json[item];
-    contract_list[0].appendChild(temp_option.cloneNode(true))
+    contract_list._yourname.appendChild(temp_option.cloneNode(true))
   }
 })
 
 submitbutton.addEventListener("click",send_date,false)
 
-request_list[0].addEventListener("change",function(){
+request_list._name.addEventListener("change",function(){
   //子要素を全て削除
-  for(var item in [...Array(request_list[1].children.length).keys()]){
+  for(var item in [...Array(request_list._shift.children.length).keys()]){
     console.log(item)
     if(item != 0){
-      request_list[1].removeChild(request_list[1].children[1])
+      request_list._shift.removeChild(request_list._shift.children[1])
     }
   }
   fetch("_get_of_member",{method:"post",headers : { "content-type" : "application/json; charset=utf-8" },
-    body : JSON.stringify({name: request_list[0].value})}).then(function(response){
+    body : JSON.stringify({name: request_list._name.value})}).then(function(response){
       return response.json()
     }).then(function(json){
       console.log(json)
@@ -118,7 +117,7 @@ request_list[0].addEventListener("change",function(){
           console.log(Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])][time]["start"] + "~" + json[item][Object.keys(json[item])][time]["end"])
           temp_option.textContent = Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])][time]["start"] + "~" + json[item][Object.keys(json[item])][time]["end"]
           temp_option.value = item+ ":" + time
-          request_list[1].appendChild(temp_option)
+          request_list._shift.appendChild(temp_option)
         }
       }
     })
