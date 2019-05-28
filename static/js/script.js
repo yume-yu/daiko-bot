@@ -54,11 +54,11 @@ function send_request(){
     })
 }
 function send_contract(){
-  fetch("_get_of_member",{method:"post",headers : { "content-type" : "application/json; charset=utf-8" },
-    body : json.stringify({name: request_list[0].value})}).then(function(response){
-      return response.json()
-    }).then(function(json){
-    })
+  fetch("_get_requested").then(function(response){
+    return response.json();
+  }).then(function(json){
+
+  })
 }
 
 function send_date(){
@@ -74,8 +74,33 @@ function send_date(){
   }
 }
 
+
+function update_request_list(){
+  //子要素を全て削除
+  for(var item in [...Array(contract_list._requested.children.length).keys()]){
+    console.log(item)
+    if(item != 0){
+      contract_list._requested.removeChild(contract_list._requested.children[1])
+    }
+  }
+  fetch("_get_requested").then(function(response){
+    return response.json();
+  }).then(function(json){
+    for(var item in json){
+      var temp_option = document.createElement('option')
+      console.log(json[item])
+      temp_option.textContent = Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])]["start"] + "~" + json[item][Object.keys(json[item])]["end"]
+      temp_option.value = item
+      contract_list._requested.appendChild(temp_option)
+    }
+  })
+}
+
 requestbutton.addEventListener("click",active_request,false)
-constractbutton.addEventListener("click",active_contract,false)
+constractbutton.addEventListener("click",function(){
+  active_contract();
+  update_request_list();
+},false)
 cancelbutton.addEventListener("click",toggle_window,false)
 
 let members_json;
@@ -93,18 +118,7 @@ fetch("_get_members").then(function(response){
   }
 })
 
-fetch("_get_requested").then(function(response){
-  return response.json();
-}).then(function(json){
-  for(var item in json){
-    var temp_option = document.createElement('option')
-    console.log(json[item])
-    temp_option.textContent = Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])]["start"] + "~" + json[item][Object.keys(json[item])]["end"]
-    temp_option.value = item
-    contract_list._requested.appendChild(temp_option)
-  }
-})
-
+update_request_list()
 submitbutton.addEventListener("click",send_date,false)
 
 request_list._name.addEventListener("change",function(){
