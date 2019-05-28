@@ -93,6 +93,18 @@ fetch("_get_members").then(function(response){
   }
 })
 
+fetch("_get_requested").then(function(response){
+  return response.json();
+}).then(function(json){
+  for(var item in json){
+    var temp_option = document.createElement('option')
+    console.log(json[item])
+    temp_option.textContent = Object.keys(json[item]) + ":" + json[item][Object.keys(json[item])]["start"] + "~" + json[item][Object.keys(json[item])]["end"]
+    temp_option.value = item
+    contract_list._requested.appendChild(temp_option)
+  }
+})
+
 submitbutton.addEventListener("click",send_date,false)
 
 request_list._name.addEventListener("change",function(){

@@ -82,6 +82,12 @@ def return_shift_of_member():
         return "wrong"
 
 
+@app.route("/_get_requested", methods=["GET"])
+def return_requested():
+    print(jsonify(shift.get_requested_shift()))
+    return jsonify(shift.get_requested_shift())
+
+
 @app.route("/_get_week", methods=["GET"])
 def return_json():
     return jsonify(ast.literal_eval(str(shift)))  # 文字列→dict→jsonに変換して返す
