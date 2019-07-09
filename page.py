@@ -58,6 +58,28 @@ def accept_request():
             return jsonify(item)
 
 
+@app.route("/contract", method=["POST"])
+def accept_contract():
+    if request.method == "POST":
+        if request.json is not None:
+            item = request.json
+            shift.add_request(
+                Shift.exchange_weekdayname(request.json["day"]),
+                request.json["name"],
+                int(request.json["index"]),
+            )
+            return jsonify(item)
+        else:
+            item = request.form
+            print(item["day"])
+            shift.add_request(
+                Shift.exchange_weekdayname(request.form["day"]),
+                request.form["name"],
+                int(request.form["index"]),
+            )
+            return jsonify(item)
+
+
 @app.route("/_get_members", methods=["GET"])
 def return_member():
     return jsonify(shift.get_member())
