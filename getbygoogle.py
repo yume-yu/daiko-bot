@@ -126,8 +126,20 @@ def get_day_schedule(date: dt.datetime = None):
         print("No upcoming events found.")
         return None
     else:
-        shit_aday = generate_shift_aday(events)
-        return shit_aday
+        return events
+
+
+def get_day_shift(date: dt.datetime = None):
+
+    if not date:
+        date = dt.datetime.now()
+    elif isinstance(date, dt.datetime):
+        # now = date
+        pass
+
+    events = get_day_schedule(date)
+    shit_aday = generate_shift_aday(events)
+    return shit_aday
 
 
 if __name__ == "__main__":
