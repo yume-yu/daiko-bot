@@ -280,6 +280,25 @@ class Shift:
                     del worker["worktime"][index - 1]["requested"]
                     break
 
+    def contract_request(self, weekday, cliant_name, contractor_name, worktime):
+        # 該当のシフトを削除する
+        for item in shift.get_shift_of_member("松田"):
+            for day in item:
+                for time in item[day]:
+                    if (
+                        time["start"] == worktime["start"]
+                        and time["end"] == worktime["end"]
+                    ):
+                        print(
+                            time["start"],
+                            time["end"],
+                            worktime["start"],
+                            worktime["end"],
+                        )
+                        break
+
+        return None
+
     def export(self, path: str):
         exportfile = open(path, "w")
         json.dump(self.shift, exportfile, indent=2, ensure_ascii=False)
@@ -670,16 +689,17 @@ class DrawShiftImg:
 
 
 if __name__ == "__main__":
-    shift = Shift.parse_json("./shift.json")
+    shift = Shift.parse_json("./now.json")
+    # shift = Shift.parse_json("./now.json")
     # shift.update("mon", "松田", ["9:00", "12:00"])
     # shift.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
     # shift.delete("mon", "新宮", 1)
     # shift.delete("mon", "新宮", 1)
-    for item in shift.shift:
-        for day in item:
-            print(day)
-            # for worktime in day.worktime:
-    print(shift.get_shift_of_member("熊田"))
+    # for item in shift.shift:
+    #    for day in item:
+    #        print(day)
+    #        # for worktime in day.worktime:
+    # print(shift.get_shift_of_member("熊田"))
     # print(shift)
     # shift = Shift("./shift.json")
     make = DrawShiftImg(
@@ -688,6 +708,12 @@ if __name__ == "__main__":
         "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
         "/Library/Fonts/Arial.ttf",
     )
+    # print(type(shift.get_shift_of_member("松田")[0]))
+    # print(shift.get_shift_of_member("松田")[0])
+    # for item in shift.get_shift_of_member("松田"):
+    #     for day in item:
+    #         for time in item[day]:
+    #             print(time["start"], time["end"])
     # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
     # make.shift.delete_request("月", "松田")
     # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
@@ -698,4 +724,4 @@ if __name__ == "__main__":
     # make.update()
     # image = make.makeImage()
     # image.show()
-    # image.save("./sample.jpg", quality=95)
+    image.save("./sample.jpg", quality=95)
