@@ -16,10 +16,11 @@ class Worktime:
             "start": self.start.strftime("%H:%M"),
             "end": self.end.strftime("%H:%M"),
             "requested": self.requested,
+            "eventid": self.eventid,
         }
         return str(obj_dict)
 
-    def __init__(self, start, end):
+    def __init__(self, start, end, eventid=None):
         """
         :param str start : シフトの開始時刻。HH:MMで書く。
         :param str end : シフトの終了時刻。HH:MMで書く。
@@ -33,6 +34,7 @@ class Worktime:
         elif type(end) is datetime.datetime:
             self.end = end
         self.requested = None
+        self.eventid = eventid
 
     def update_start(self, start):
         """
