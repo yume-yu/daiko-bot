@@ -96,11 +96,16 @@ class ConnectGoogle:
             worker_name = str(worker["summary"])
             work_start = dt.datetime.fromisoformat(worker["start"]["dateTime"])
             work_end = dt.datetime.fromisoformat(worker["end"]["dateTime"])
+            eventid = worker["id"]
             worker_index = Shift.has_worker(worker_name, day)
             if worker_index is not None:
-                day[worker_index].append_worktime(Worktime(work_start, work_end))
+                day[worker_index].append_worktime(
+                    Worktime(work_start, work_end, eventid=eventid)
+                )
             else:
-                new_worker_obj = Worker(worker_name, [Worktime(work_start, work_end)])
+                new_worker_obj = Worker(
+                    worker_name, [Worktime(work_start, work_end, eventid=eventid)]
+                )
                 day.append(new_worker_obj)
 
         weekday = Shift.WORKDAYS[day[0].worktime[0].start.weekday()]
@@ -172,8 +177,8 @@ if __name__ == "__main__":
     date = dt.datetime.now()
     date = date - dt.timedelta(days=0)
     connect = ConnectGoogle()
-    connect.get_calenderID()
     shift = connect.get_week_shift(dt.datetime.now())
+    print(shift["mon"][0])
     shift = Shift.parse_dict(shift)
 
     make = DrawShiftImg(
