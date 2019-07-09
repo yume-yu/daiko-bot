@@ -164,6 +164,14 @@ class Shift:
             return Shift.WORKDAYS[4]
         raise ValueError("invaild weekday text")
 
+    @staticmethod
+    def has_worker(name: str, workers):
+        for (index, worker) in enumerate(workers):
+            if worker.name == name:
+                return index
+        else:
+            return None
+
     def __init__(self, mon, tue, wed, thu, fri):
         self.shift = [mon, tue, wed, thu, fri]
         self.sort_by_starttime()
