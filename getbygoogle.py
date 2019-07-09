@@ -84,17 +84,21 @@ def calc_nearly_monday(target: dt.datetime):
 
 
 def generate_shift_aday(events: list):
-    first_item = events[0]["start"]["dateTime"]
-    first_item_date = dt.datetime.fromisoformat(first_item)
-    weekday = Shift.WORKDAYS[first_item_date.weekday()]
 
-    day = {weekday: []}
+    day = []
     for worker in events:
-        worker_name = worker["summary"]
+        worker_name = str(worker["summary"])
         work_start = dt.datetime.fromisoformat(worker["start"]["dateTime"])
         work_end = dt.datetime.fromisoformat(worker["end"]["dateTime"])
-        new_worker_obj = Worker(worker_name, [Worktime(work_start, work_end)])
-        day[weekday].append(new_worker_obj)
+        worker_index = Shift.has_worker(worker_name, day)
+        if worker_index is not None:
+            day[worker_index].append_worktime(Worktime(work_start, work_end))
+        else:
+            new_worker_obj = Worker(worker_name, [Worktime(work_start, work_end)])
+            day.append(new_worker_obj)
+
+    weekday = Shift.WORKDAYS[day[0].worktime[0].start.weekday()]
+    day = {weekday: day}
     return day
 
 
@@ -168,7 +172,7 @@ if __name__ == "__main__":
     date = date - dt.timedelta(days=0)
     # shift = get_day_schedule(date)
     shift = get_week_shift(dt.datetime.now())
-    shift = Shift(shift["mon"], shift["mon"], shift["mon"], shift["mon"], shift["mon"])
+    shift = Shift.parse_dict(shift)
 
     make = DrawShiftImg(
         shift,
