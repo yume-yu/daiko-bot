@@ -13,11 +13,11 @@ from pytz import timezone
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 # If modifying these scopes, delete the file token.pickle.
-SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
+SCOPES = ["https://www.googleapis.com/auth/calendar"]
 TOKEN_FILENAME = "token.pickle"
 
 
-class GetByGoogle:
+class ConnectGoogle:
     @staticmethod
     def update_token(token_name):
         creds = None
@@ -44,7 +44,7 @@ class GetByGoogle:
 
         creds = None
 
-        GetByGoogle.update_token(TOKEN_FILENAME)
+        ConnectGoogle.update_token(TOKEN_FILENAME)
 
         # 認証トークンがあったらそれを使う
         if os.path.exists(TOKEN_FILENAME):
@@ -165,7 +165,7 @@ class GetByGoogle:
 if __name__ == "__main__":
     date = dt.datetime.now()
     date = date - dt.timedelta(days=0)
-    connect = GetByGoogle()
+    connect = ConnectGoogle()
     shift = connect.get_week_shift(dt.datetime.now())
     shift = Shift.parse_dict(shift)
 
