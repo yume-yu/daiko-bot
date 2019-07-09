@@ -60,6 +60,12 @@ class ConnectGoogle:
         service = build("calendar", "v3", credentials=creds)
         return service
 
+    def get_calenderID(self):
+        calendar_list = self.service.calendarList().list().execute()
+        print("calender name : calender id")
+        for calendar_entry in calendar_list["items"]:
+            print("{} : {}".format(calendar_entry["summary"], calendar_entry["id"]))
+
     def __init__(self):
         self.service = self.connect_google()
 
@@ -166,6 +172,7 @@ if __name__ == "__main__":
     date = dt.datetime.now()
     date = date - dt.timedelta(days=0)
     connect = ConnectGoogle()
+    connect.get_calenderID()
     shift = connect.get_week_shift(dt.datetime.now())
     shift = Shift.parse_dict(shift)
 
