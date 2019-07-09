@@ -137,6 +137,16 @@ class Shift:
         return json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
 
     @staticmethod
+    def parse_dict(shift_dict: dict):
+        return Shift(
+            shift_dict.get(Shift.WORKDAYS[0]),
+            shift_dict.get(Shift.WORKDAYS[1]),
+            shift_dict.get(Shift.WORKDAYS[2]),
+            shift_dict.get(Shift.WORKDAYS[3]),
+            shift_dict.get(Shift.WORKDAYS[4]),
+        )
+
+    @staticmethod
     def count_worktime(worktime, columnCount=False):
         delta = worktime.end - worktime.start
         hour = int(delta.seconds) / 3600
