@@ -10,7 +10,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from pytz import timezone
 
-from workmanage import Shift, Worker, Worktime
+from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ["https://www.googleapis.com/auth/calendar.readonly"]
@@ -77,6 +77,12 @@ def calc_opening_hours(target: dt.datetime, when: str):
         return None
 
 
+def calc_nearly_monday(target: dt.datetime):
+    diff_to_monday = dt.timedelta(days=target.weekday())
+    nearly_monday = target - diff_to_monday
+    return nearly_monday
+
+
 def generate_shift_aday(events: list):
     first_item = events[0]["start"]["dateTime"]
     first_item_date = dt.datetime.fromisoformat(first_item)
@@ -87,7 +93,7 @@ def generate_shift_aday(events: list):
         worker_name = worker["summary"]
         work_start = dt.datetime.fromisoformat(worker["start"]["dateTime"])
         work_end = dt.datetime.fromisoformat(worker["end"]["dateTime"])
-        new_worker_obj = Worker(worker_name, Worktime(work_start, work_end))
+        new_worker_obj = Worker(worker_name, [Worktime(work_start, work_end)])
         day[weekday].append(new_worker_obj)
     return day
 
@@ -142,8 +148,33 @@ def get_day_shift(date: dt.datetime = None):
     return shit_aday
 
 
+def get_week_shift(date: dt.datetime = None):
+
+    if not date:
+        date = dt.datetime.now()
+    elif isinstance(date, dt.datetime):
+        # now = date
+        pass
+    shift_dict = {}
+    nearly_monday = calc_nearly_monday(date)
+    for count in range(5):
+        aday = get_day_shift(nearly_monday + dt.timedelta(days=count))
+        shift_dict.update(aday)
+    return shift_dict
+
+
 if __name__ == "__main__":
     date = dt.datetime.now()
     date = date - dt.timedelta(days=0)
-    shift = get_day_schedule(date)
-    print(shift)
+    # shift = get_day_schedule(date)
+    shift = get_week_shift(dt.datetime.now())
+    shift = Shift(shift["mon"], shift["mon"], shift["mon"], shift["mon"], shift["mon"])
+
+    make = DrawShiftImg(
+        shift,
+        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
+        "/Library/Fonts/Arial.ttf",
+    )
+    image = make.makeImage()
+    image.show()
