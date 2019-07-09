@@ -4,33 +4,148 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 
 
+class Worktime:
+    def _str__(self):
+        return_str = f"start:{0} end:{1} requested:{2}".format(
+            self.start, self.end, self.requested
+        )
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {
+            "start": self.start.strftime("%H:%M"),
+            "end": self.end.strftime("%H:%M"),
+            "requested": self.requested,
+        }
+        return str(obj_dict)
+
+    def __init__(self, start, end):
+        """
+        :param str start : シフトの開始時刻。HH:MMで書く。
+        :param str end : シフトの終了時刻。HH:MMで書く。
+        """
+        if type(start) is str:
+            self.start = datetime.datetime.strptime(start, "%H:%M")
+        elif type(start) is datetime.datetime:
+            self.start = start
+        if type(end) is str:
+            self.end = datetime.datetime.strptime(end, "%H:%M")
+        elif type(end) is datetime.datetime:
+            self.end = end
+        self.requested = None
+
+    def update_start(self, start):
+        """
+        :param str start : 新しいシフトの開始時刻。HH:MMで書く。
+        """
+        self.start = datetime.datetime.strptime(start, "%H:%M")
+
+    def update_end(self, end):
+        """
+        :param str end : 新しいシフトの終了時刻。HH:MMで書く。
+        """
+        self.end = datetime.datetime.strptime(end, "%H:%M")
+
+    def update(self, start, end):
+        """
+        :param str start : 新しいシフトの開始時刻。HH:MMで書く。
+        :param str end : 新しいシフトの終了時刻。HH:MMで書く。
+        """
+        self.update_start(start)
+        self.update_end(end)
+
+    def add_request(self, start, end):
+        """
+        :param str start : 新しいシフトの開始時刻。HH:MMで書く。
+        :param str end : 新しいシフトの終了時刻。HH:MMで書く。
+        """
+        self.requested = Worktime(start, end)
+
+    def to_dict(self):
+        return_dict = {
+            "start": self.start.strftime("%H:%M"),
+            "end": self.end.strftime("%H:%M"),
+        }
+        return return_dict
+
+
+class Worker:
+    def _str__(self):
+        return_str = f"name:{0} worktime:{1}".format(self.name, self.worktime)
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {"name": self.name, "worktime": self.worktime}
+        return str(obj_dict)
+
+    def __init__(self, name, times):
+        """
+        :param str name : 働く人の名前。
+        :param times: その人が働く時間。Worktimeオブジェクトのリスト
+        """
+        self.name = name
+        self.worktime = times
+
+
 class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
+    WORKDAYS_JP = ("月", "火", "水", "木", "金")
+
+    def _str__(self):
+        return_str = ""
+        for (weekdayindex, day) in enumerate(self.shift):
+            return_str += "{0} : {1},".format(Shift.WORKDAYS[weekdayindex], day)
+        return return_str
+
+    def __repr__(self):
+        obj_dict = {
+            Shift.WORKDAYS[weekdayindex]: day
+            for (weekdayindex, day) in enumerate(self.shift)
+        }
+        return str(obj_dict)
+
+    @staticmethod
+    def hook(dct):
+        if dct.get("start") is not None:
+            return Worktime(dct["start"], dct["end"])
+        elif dct.get("name") is not None:
+            return Worker(dct["name"], dct["worktime"])
+        elif dct.get("mon") is not None:
+            return Shift(
+                dct.get(Shift.WORKDAYS[0]),
+                dct.get(Shift.WORKDAYS[1]),
+                dct.get(Shift.WORKDAYS[2]),
+                dct.get(Shift.WORKDAYS[3]),
+                dct.get(Shift.WORKDAYS[4]),
+            )
+        else:
+            return dct
 
     @staticmethod
     def parse_json(json_path):
+        """
+        Parameters
+        ----------
+        json_path : string
+            読み込むシフトのjsonファイルのpath
+        """
         shiftFile = open(json_path, "r")
         shift_dict = json.load(shiftFile)
-        return shift_dict
+        return json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
 
     @staticmethod
     def count_worktime(worktime, columnCount=False):
-        startTime = {
-            "hour": int(worktime["start"].split(":")[0]),
-            "minute": int(worktime["start"].split(":")[1]),
-        }
-        endTime = {
-            "hour": int(worktime["end"].split(":")[0]),
-            "minute": int(worktime["end"].split(":")[1]),
-        }
-        worktimeLangth = (endTime["hour"] - startTime["hour"]) + (
-            ((endTime["minute"] - startTime["minute"]) / 60)
-        )
+        delta = worktime.end - worktime.start
+        hour = int(delta.seconds) / 3600
         if columnCount:
-            startColumn = (startTime["hour"] - 8) * 2 + (startTime["minute"] / 30)
-            return {"startColumn": startColumn, "columns": worktimeLangth * 2}
+            diff9th = worktime.start - datetime.timedelta(hours=8)
+            # diff9th = worktime.start - (worktime.start - datetime.timedelta(hours=9))
+            startColumn = (
+                int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
+            )
+            return {"startColumn": startColumn, "columns": hour * 2}
         else:
-            return worktimeLangth
+            return hour * 2
 
     @staticmethod
     def exchange_weekdayname(weekday):
@@ -46,67 +161,113 @@ class Shift:
             return Shift.WORKDAYS[4]
         raise ValueError("invaild weekday text")
 
-    def __init__(self, path):
-        self.shift = Shift.parse_json(path)
+    def __init__(self, mon, tue, wed, thu, fri):
+        self.shift = [mon, tue, wed, thu, fri]
         self.sort_by_starttime()
 
+    def get_member(self):
+        menbers = []
+        for day in self.shift:
+            for worker in day:
+                if worker.name not in menbers:
+                    menbers.append(worker.name)
+        return menbers
+
+    def get_shift_of_member(self, name):
+        shift_list = []
+        for day in self.shift:
+            for worker in day:
+                if worker.name == name:
+                    print(worker)
+                    shift_list.append(
+                        {
+                            Shift.WORKDAYS_JP[self.shift.index(day)]: [
+                                time.to_dict() for time in worker.worktime
+                            ]
+                        }
+                    )
+        return shift_list
+
+    def get_requested_shift(self):
+        shift_list = []
+        for day in self.shift:
+            for worker in day:
+                for time in worker.worktime:
+                    if time.requested is not None:
+                        shift_list.append(
+                            {Shift.WORKDAYS_JP[self.shift.index(day)]: time.to_dict()}
+                        )
+
+        return shift_list
+
     def sort_by_starttime(self):
-        for weekday in self.shift:
-            for worker in self.shift[weekday]["worker"]:
-                # worker["worktime"] =
-                worker["worktime"] = sorted(
-                    worker["worktime"], key=lambda x: x["start"]
-                )
-            self.shift[weekday]["worker"] = sorted(
-                self.shift[weekday]["worker"],
-                key=lambda x: (x["worktime"][0]["start"], x["worktime"][0]["end"]),
+        for (weekdayindex, workers) in enumerate(self.shift):
+            for worker in workers:
+                worker.worktime = sorted(worker.worktime, key=lambda x: x.start)
+            self.shift[weekdayindex] = sorted(
+                workers,
+                key=lambda worker: (worker.worktime[0].start, worker.worktime[0].end),
             )
 
     def add(self, weekday, name, worktime):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"].append(worktime)
+        """
+        :param str weekday : 追加するシフトの曜日。
+        :param str name : 働く人の名前。
+        :param worktimes: 追加するシフトの時間。["HH:MM","HH:MM"]
+        """
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                worker.worktime.append(Worktime(worktime[0], worktime[1]))
                 break
         else:
-            newWorker = {"name": name, "worktime": [worktime]}
-            self.shift[weekday]["worker"].append(newWorker)
-
+            newWorker = Worker(
+                name, (Worktime(times[0], times[1]) for times in worktime)
+            )
+            self.shift[weekdayindex].append(newWorker)
         self.sort_by_starttime()
 
     def delete(self, weekday, name, index=1):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                del worker["worktime"][index - 1]
-                if not worker["worktime"]:
-                    self.shift[weekday]["worker"].remove(worker)
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                del worker.worktime[index - 1]
+                if not worker.worktime:
+                    self.shift[weekdayindex].remove(worker)
         self.sort_by_starttime()
 
-    def update(self, weekday, name, worktime, index=1):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"][index - 1]["start"] = worktime["start"]
-                worker["worktime"][index - 1]["end"] = worktime["end"]
+    def update(self, weekday, name, time, index=1):
+        """
+        :param str weekday : 追加するシフトの曜日。
+        :param str name : 働く人の名前。
+        :param time: 修正後のシフトの時間。["HH:MM","HH:MM"]
+        :param index: 修正するシフトがその日の何番目か
+        """
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                worker.worktime[index - 1].update(time[0], time[1])
         self.sort_by_starttime()
 
     def add_request(self, weekday, name, index=1, requestedtime=None):
-        weekday = Shift.exchange_weekdayname(weekday)
-        for worker in self.shift[weekday]["worker"]:
-            if worker["name"] == name:
-                worker["worktime"][index - 1]["requested"] = {
-                    "start": (
-                        worker["worktime"][index - 1]["start"]
-                        if requestedtime is None
-                        else requestedtime["start"]
-                    ),
-                    "end": (
-                        worker["worktime"][index - 1]["end"]
-                        if requestedtime is None
-                        else requestedtime["end"]
-                    ),
-                }
+        weekdayindex = Shift.WORKDAYS.index(Shift.exchange_weekdayname(weekday))
+        for worker in self.shift[weekdayindex]:
+            if worker.name == name:
+                if requestedtime is None:
+                    worker.worktime[index - 1].requested = Worktime(
+                        worker.worktime[index - 1].start, worker.worktime[index - 1].end
+                    )
+                    # worker.worktime[index - 1]["requested"] = {
+                    #     "start": (
+                    #         if requestedtime is None
+                    #         else requestedtime["start"]
+                    #     ),
+                    #     "end": (
+                    #         worker["worktime"][index - 1]["end"]
+                    #         if requestedtime is None
+                    #         else requestedtime["end"]
+                    #     ),
+                    # }
                 break
 
     def delete_request(self, weekday, name, index=1):
@@ -119,13 +280,31 @@ class Shift:
                     del worker["worktime"][index - 1]["requested"]
                     break
 
+    def contract_request(self, weekday, cliant_name, contractor_name, worktime):
+        # 該当のシフトを削除する
+        for item in shift.get_shift_of_member("松田"):
+            for day in item:
+                for time in item[day]:
+                    if (
+                        time["start"] == worktime["start"]
+                        and time["end"] == worktime["end"]
+                    ):
+                        print(
+                            time["start"],
+                            time["end"],
+                            worktime["start"],
+                            worktime["end"],
+                        )
+                        break
+
+        return None
+
     def export(self, path: str):
         exportfile = open(path, "w")
         json.dump(self.shift, exportfile, indent=2, ensure_ascii=False)
 
 
 class DrawShiftImg:
-
     FOR_WIDTH_RATIO = 1624 / 38
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
@@ -137,8 +316,9 @@ class DrawShiftImg:
         (255, 230, 154),
         (182, 215, 168),
         (162, 196, 201),
-        (162, 196, 201),
-        (162, 196, 201),
+        (141, 179, 247),
+        (133, 184, 231),
+        (168, 146, 209),
         (213, 166, 189),
     )
     HEIGHT = 1026
@@ -146,9 +326,11 @@ class DrawShiftImg:
     gridLineWeight = 1
     boldLineWeight = 3
 
-    def __init__(self, shift, kanjiFontPath, fontPath=None):
+    def __init__(self, shift, kanjiFontPath, kanjiBoldFontPath=None, fontPath=None):
         if fontPath is None:
             fontPath = kanjiFontPath
+        if kanjiBoldFontPath is None:
+            kanjiBoldFontPath = kanjiFontPath
 
         self.shift = shift
         divWidth = self.count_need_row()  # シフトを挿入する列数
@@ -156,6 +338,7 @@ class DrawShiftImg:
         self.font = ImageFont.truetype(str(fontPath), 25)
         self.smallFont = ImageFont.truetype(str(fontPath), 15)
         self.kanjiFont = ImageFont.truetype(str(kanjiFontPath), 25)
+        self.kanjBoldFont = ImageFont.truetype(str(kanjiBoldFontPath), 25)
         self.width = int(DrawShiftImg.FOR_WIDTH_RATIO * self.needRows)
         self.height = DrawShiftImg.HEIGHT
         self.image = Image.new("RGB", (self.width, self.height), DrawShiftImg.WHITE)
@@ -189,10 +372,10 @@ class DrawShiftImg:
         countedRows = 0
         if selectedWeekday is None:
             for weekday in self.shift.shift:
-                countedRows += len(self.shift.shift[weekday]["worker"])
+                countedRows += len(weekday)
             return countedRows
         else:
-            return len(self.shift.shift[selectedWeekday]["worker"])
+            return len(selectedWeekday)
 
     def calc_rect_apices(self, worktime, row):
         points = []
@@ -279,25 +462,44 @@ class DrawShiftImg:
                 lineWeight,
             )
 
-    def print_weekseparateline(self, font=None, lineWeight=boldLineWeight, color=BLACK):
+    def print_weekseparateline(
+        self,
+        font=None,
+        boldFont=None,
+        lineWeight=boldLineWeight,
+        color=BLACK,
+        weekday=None,
+    ):
         if font is None:
             font = self.kanjiFont
+        if boldFont is None:
+            boldFont = self.kanjBoldFont
 
         tmpCountRow = 2  # 両サイド2列分開いてるからoffset
         weekdayList = ("月", "火", "水", "木", "金")
+        if weekday is None:
+            weekday = "mon"
+        weekday = Shift.exchange_weekdayname(weekday)
         self.drawObj.line(
             [(self.rowWidth * 2, 0), (self.rowWidth * 2, self.height)],
             (0, 0, 0),
             lineWeight,
         )
-        for (weekday, loopCount) in zip(self.shift.shift, range(len(self.shift.shift))):
+        for (day, loopCount) in zip(self.shift.shift, range(len(self.shift.shift))):
             weekdayLabelPoint = (
-                self.rowWidth * (tmpCountRow + self.count_need_row(weekday) / 2)
+                self.rowWidth * (tmpCountRow + self.count_need_row(day) / 2)
                 - font.getsize(weekdayList[loopCount])[0] / 2,
                 (self.columnHeight - font.getsize(weekdayList[loopCount])[1]) / 2,
             )
-            self.drawObj.text(weekdayLabelPoint, weekdayList[loopCount], color, font)
-            tmpCountRow += self.count_need_row(weekday)
+            if weekday == day:
+                self.drawObj.text(
+                    weekdayLabelPoint, weekdayList[loopCount], color, boldFont
+                )
+            else:
+                self.drawObj.text(
+                    weekdayLabelPoint, weekdayList[loopCount], color, font
+                )
+            tmpCountRow += self.count_need_row(day)
             self.drawObj.line(
                 [
                     (self.rowWidth * (tmpCountRow), 0),
@@ -307,18 +509,51 @@ class DrawShiftImg:
                 lineWeight,
             )
 
-    def print_names(self, font=None):
+    def print_names(self, font=None, boldFont=None, weekday=None):
         if font is None:
             font = self.kanjiFont
-
+        if boldFont is None:
+            boldFont = self.kanjBoldFont
+        if weekday is None:
+            weekday = datetime.datetime.now().strftime("%a")
+        """
+        weekday = Shift.exchange_weekdayname(weekday)
+        weekdaylist = []
+        print(Shift.WORKDAYS[0])
+        weekdaylist.extend(
+            [Shift.WORKDAYS[0]
+                for i in self.shift[Shift.WORKDAYS[0]]["worker"]]
+        ).extend(
+            [Shift.WORKDAYS[1]
+                for i in self.shift[Shift.WORKDAYS[1]]["worker"]]
+        ).extend(
+            [Shift.WORKDAYS[2]
+                for i in self.shift[Shift.WORKDAYS[2]]["worker"]]
+        ).extend(
+            [Shift.WORKDAYS[3]
+                for i in self.shift[Shift.WORKDAYS[3]]["worker"]]
+        ).extend(
+            [Shift.WORKDAYS[4]
+                for i in self.shift[Shift.WORKDAYS[4]]["worker"]]
+        )
+        print(weekdaylist)
+        """
         nameBottomOfiiset = 20
         for (row, name) in enumerate(
-            [
-                worker["name"]
-                for weekday in self.shift.shift
-                for worker in self.shift.shift[weekday]["worker"]
-            ]
+            [worker.name for day in self.shift.shift for worker in day]
         ):
+            """
+              if day == weekday:
+                  self.write_text_ttb(
+                      {
+                          "x": self.rowWidth * (row + 2.5),
+                          "y": self.columnHeight + self.heightOffset + nameBottomOfiiset,
+                      },
+                      name,
+                      font=boldFont,
+                  )
+              else:
+              """
             self.write_text_ttb(
                 {
                     "x": self.rowWidth * (row + 2.5),
@@ -340,20 +575,17 @@ class DrawShiftImg:
         worktimePerDay = 0
         worktimeTextOffset = 3
         for weekday in self.shift.shift:
-            for worker in self.shift.shift[weekday]["worker"]:
-                for worktime in worker["worktime"]:
+            for worker in weekday:
+                for worktime in worker.worktime:
                     worktimePerDay += Shift.count_worktime(worktime)
                     rectApex = self.calc_rect_apices(worktime, rowCounter)
                     self.drawObj.polygon(
-                        rectApex,
-                        fill=colorTable[
-                            self.shift.shift[weekday]["worker"].index(worker)
-                        ],
+                        rectApex, fill=colorTable[weekday.index(worker)]
                     )
-                    if "requested" in worktime:
-                        requestTime = Shift.count_worktime(worktime["requested"])
+                    if worktime.requested is not None:
+                        requestTime = Shift.count_worktime(worktime.requested)
                         worktimePerDay -= requestTime
-                        apex = self.calc_rect_apices(worktime["requested"], rowCounter)
+                        apex = self.calc_rect_apices(worktime.requested, rowCounter)
                         self.drawObj.polygon(apex, self.LIGHT_GRAY)
 
                 else:
@@ -447,8 +679,8 @@ class DrawShiftImg:
             )
             timeToPrint += datetime.timedelta(minutes=30)
 
-    def makeImage(self):
-        self.print_worktimerect()
+    def makeImage(self, empday=None, timepos="None"):
+        self.print_worktimerect(timepos)
         self.print_names()
         self.print_grid()
         self.print_weekseparateline()
@@ -457,25 +689,39 @@ class DrawShiftImg:
 
 
 if __name__ == "__main__":
-    shift = Shift("./shift.json")
+    shift = Shift.parse_json("./now.json")
+    # shift = Shift.parse_json("./now.json")
+    # shift.update("mon", "松田", ["9:00", "12:00"])
+    # shift.add("mon", "新宮", [["12:00", "16:00"], ["9:00", "11:00"]])
+    # shift.delete("mon", "新宮", 1)
+    # shift.delete("mon", "新宮", 1)
+    # for item in shift.shift:
+    #    for day in item:
+    #        print(day)
+    #        # for worktime in day.worktime:
+    # print(shift.get_shift_of_member("熊田"))
+    # print(shift)
+    # shift = Shift("./shift.json")
     make = DrawShiftImg(
         shift,
         "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
+        "/Users/yume_yu/Library/Fonts/Cica-Bold.ttf",
         "/Library/Fonts/Arial.ttf",
     )
-    make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
-    make.shift.delete_request("月", "松田")
-    make.update()
+    # print(type(shift.get_shift_of_member("松田")[0]))
+    # print(shift.get_shift_of_member("松田")[0])
+    # for item in shift.get_shift_of_member("松田"):
+    #     for day in item:
+    #         for time in item[day]:
+    #             print(time["start"], time["end"])
+    # make.shift.add_request("月", "松田", requestedtime={"start": "13:00", "end": "16:00"})
+    # make.shift.delete_request("月", "松田")
+    # make.shift.add("月", "松田", {"start": "09:00", "end": "10:00"})
+    # make.update()
     image = make.makeImage()
     image.show()
-    make.shift.export("./export.json")
-    shift = Shift("./export.json")
-    make = DrawShiftImg(
-        shift,
-        "/Users/yume_yu/Library/Fonts/Cica-Regular.ttf",
-        "/Library/Fonts/Arial.ttf",
-    )
-    image = make.makeImage()
-    image.show()
-
-# image.save("./sample.jpg", quality=95)
+    # make.shift.export("./export.json")
+    # make.update()
+    # image = make.makeImage()
+    # image.show()
+    image.save("./sample.jpg", quality=95)

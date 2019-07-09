@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="jp">
+  <head>
+    <meta charset="utf-8">
+    <link href="/static/css/reset.css" rel="stylesheet" type="text/css">
+    <link href="/static/css/style.css" rel="stylesheet" type="text/css">
+  </head>
+  <body>
+    <header>
+      <h1>代行依頼管理</h1>
+    </header>
+    <main class="container vertical-items">
+      <div id="shift-img-div" class="items-group">
+        <h2>今週のシフト</h2>
+        <div class="image-case">
+          {% if imgpath %}
+          <img class="" src={{imgpath}} ></img>
+          {% endif %}
+        </div>
+
+      </div>
+      <div class="items-group " >
+        <div class="container space-around image-case">
+          <div class="button-case"><a id="request">代行依頼</a></div>
+          <div class="button-case"><a id="contract">代行請負</a></div>
+        </div>
+      </div>
+      <div id="window" class="items-group floatbox hidden-item vertical-items container space-around">
+        <div id="request-form" class="hidden-item">
+        <form class="container">
+          <h2>代行依頼</h2>
+          <label>名前 : </label>
+          <select name="_name" required>
+            <option value="">選択してください</option>
+          </select>
+          <label>シフト : </label>
+          <select name="_shift" required>
+            <option value="">選択してください</option>
+          </select>
+        </form>
+        </div>
+        <div id="contract-form" class="hidden-item">
+        <form class="container">
+          <h2>代行請負</h2>
+          <label>募集中のシフト : </label>
+          <select name="_requested"required>
+            <option value="">選択してください</option>
+          </select>
+          <label>名前 : </label>
+          <select name="_yourname"required>
+            <option value="">選択してください</option>
+          </select>
+        </form>
+        </div>
+          <div class="container space-around">
+            <div class="button-case"><a id="cancel">キャンセル</a></div>
+            <div class="button-case"><a id="submit">送信</a></div>
+          </div>
+      </div>
+    </main>
+    <script type="text/javascript" src="static/js/script.js"></script>
+  </body>
+</html>
