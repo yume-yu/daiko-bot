@@ -15,6 +15,7 @@ from workmanage import DrawShiftImg, Shift, Worker, Worktime
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 TOKEN_FILENAME = "token.pickle"
+CALENDERID = "primary"
 
 
 class ConnectGoogle:
@@ -129,7 +130,7 @@ class ConnectGoogle:
         events_result = (
             self.service.events()
             .list(
-                calendarId="primary",
+                calendarId=CALENDERID,
                 timeMin=before_open,
                 timeMax=after_close,
                 singleEvents=True,
