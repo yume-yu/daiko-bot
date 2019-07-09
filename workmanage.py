@@ -86,6 +86,9 @@ class Worker:
         self.name = name
         self.worktime = times
 
+    def append_worktime(self, new_worktime: Worktime):
+        self.worktime.append(new_worktime)
+
 
 class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
