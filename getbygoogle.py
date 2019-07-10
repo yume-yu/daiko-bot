@@ -147,6 +147,23 @@ class ConnectGoogle:
         else:
             return events
 
+    def delete_schedule(self, eventid):
+        self.service.events().delete(calendarId=CALENDERID, eventId=eventid).execute()
+
+    def insert_schedule(self, name: str, start: dt.datetime, end: dt.datetime):
+        TIMEZONE = "Asia/Tokyo"
+        start = start.astimezone(timezone(TIMEZONE)).isoformat()
+        end = end.astimezone(timezone(TIMEZONE)).isoformat()
+        event = {
+            "summary": name,
+            "end": {"dateTime": end, "timeZone": TIMEZONE},
+            "start": {"dateTime": start, "timeZone": TIMEZONE},
+        }
+        event = (
+            self.service.events().insert(calendarId=CALENDERID, body=event).execute()
+        )
+        return self.generate_shift_aday([event])
+
     def get_day_shift(self, date: dt.datetime = None):
 
         if not date:
@@ -178,8 +195,10 @@ if __name__ == "__main__":
     date = dt.datetime.now()
     date = date - dt.timedelta(days=0)
     connect = ConnectGoogle()
+    start = date + dt.timedelta(days=-1)
+    end = date + dt.timedelta(days=-1, hours=1)
+    # print(connect.insert_schedule("笠松", start, end))
     shift = connect.get_week_shift(dt.datetime.now())
-    print(shift["mon"][0])
     shift = Shift.parse_dict(shift)
 
     make = DrawShiftImg(
