@@ -9,13 +9,13 @@ from google.auth.transport.requests import Request
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from pytz import timezone
-
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
 TOKEN_FILENAME = "token.pickle"
 CALENDERID = "primary"
+TIMEZONE = "Asia/Tokyo"
 
 
 class ConnectGoogle:
@@ -151,7 +151,6 @@ class ConnectGoogle:
         self.service.events().delete(calendarId=CALENDERID, eventId=eventid).execute()
 
     def insert_schedule(self, name: str, start: dt.datetime, end: dt.datetime):
-        TIMEZONE = "Asia/Tokyo"
         start = start.astimezone(timezone(TIMEZONE)).isoformat()
         end = end.astimezone(timezone(TIMEZONE)).isoformat()
         event = {
@@ -163,6 +162,21 @@ class ConnectGoogle:
             self.service.events().insert(calendarId=CALENDERID, body=event).execute()
         )
         return self.generate_shift_aday([event])
+
+    def update_schedule(self, eventid: str, start: dt.datetime, end: dt.datetime):
+        start = start.astimezone(timezone(TIMEZONE)).isoformat()
+        end = end.astimezone(timezone(TIMEZONE)).isoformat()
+        event = (
+            self.service.events().get(calendarId=CALENDERID, eventId=eventid).execute()
+        )
+        event["start"]["dateTime"] = start
+        event["end"]["dateTime"] = end
+        updated_event = (
+            self.service.events()
+            .update(calendarId=CALENDERID, eventId=eventid, body=event)
+            .execute()
+        )
+        return updated_event
 
     def get_day_shift(self, date: dt.datetime = None):
 
@@ -197,7 +211,10 @@ if __name__ == "__main__":
     connect = ConnectGoogle()
     start = date + dt.timedelta(days=-1)
     end = date + dt.timedelta(days=-1, hours=1)
-    # print(connect.insert_schedule("笠松", start, end))
+    shift_id = (
+        connect.get_day_shift(date - dt.timedelta(days=1))["tue"][0].worktime[0].eventid
+    )
+    print(connect.update_schedule(shift_id, start, end))
     shift = connect.get_week_shift(dt.datetime.now())
     shift = Shift.parse_dict(shift)
 
