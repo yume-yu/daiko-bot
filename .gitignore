@@ -1,3 +1,5 @@
 *.json
 !sample.json
 static/img/shiftimage-*.jpg
+token*
+client_secret.json

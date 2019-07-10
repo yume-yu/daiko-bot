@@ -16,10 +16,11 @@ class Worktime:
             "start": self.start.strftime("%H:%M"),
             "end": self.end.strftime("%H:%M"),
             "requested": self.requested,
+            "eventid": self.eventid,
         }
         return str(obj_dict)
 
-    def __init__(self, start, end):
+    def __init__(self, start, end, eventid=None):
         """
         :param str start : シフトの開始時刻。HH:MMで書く。
         :param str end : シフトの終了時刻。HH:MMで書く。
@@ -33,6 +34,7 @@ class Worktime:
         elif type(end) is datetime.datetime:
             self.end = end
         self.requested = None
+        self.eventid = eventid
 
     def update_start(self, start):
         """
@@ -86,6 +88,9 @@ class Worker:
         self.name = name
         self.worktime = times
 
+    def append_worktime(self, new_worktime: Worktime):
+        self.worktime.append(new_worktime)
+
 
 class Shift:
     WORKDAYS = ("mon", "tue", "wed", "thu", "fri")
@@ -134,6 +139,16 @@ class Shift:
         return json.loads(json.dumps(shift_dict), object_hook=Shift.hook)
 
     @staticmethod
+    def parse_dict(shift_dict: dict):
+        return Shift(
+            shift_dict.get(Shift.WORKDAYS[0]),
+            shift_dict.get(Shift.WORKDAYS[1]),
+            shift_dict.get(Shift.WORKDAYS[2]),
+            shift_dict.get(Shift.WORKDAYS[3]),
+            shift_dict.get(Shift.WORKDAYS[4]),
+        )
+
+    @staticmethod
     def count_worktime(worktime, columnCount=False):
         delta = worktime.end - worktime.start
         hour = int(delta.seconds) / 3600
@@ -160,6 +175,14 @@ class Shift:
         elif weekday in (Shift.WORKDAYS[4], "金", "きん", "Friday", "Fri"):
             return Shift.WORKDAYS[4]
         raise ValueError("invaild weekday text")
+
+    @staticmethod
+    def has_worker(name: str, workers):
+        for (index, worker) in enumerate(workers):
+            if worker.name == name:
+                return index
+        else:
+            return None
 
     def __init__(self, mon, tue, wed, thu, fri):
         self.shift = [mon, tue, wed, thu, fri]
