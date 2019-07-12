@@ -1,4 +1,4 @@
-import datetime
+gmport datetime
 import json
 
 from PIL import Image, ImageDraw, ImageFont
@@ -201,14 +201,7 @@ class Shift:
         for day in self.shift:
             for worker in day:
                 if worker.name == name:
-                    print(worker)
-                    shift_list.append(
-                        {
-                            Shift.WORKDAYS_JP[self.shift.index(day)]: [
-                                time.to_dict() for time in worker.worktime
-                            ]
-                        }
-                    )
+                    shift_list.append(worker)
         return shift_list
 
     def get_requested_shift(self):
