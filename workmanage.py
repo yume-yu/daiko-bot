@@ -20,7 +20,7 @@ class Worktime:
         }
         return str(obj_dict)
 
-    def __init__(self, start, end, eventid=None):
+    def __init__(self, start, end, eventid=None, requested=None):
         """
         :param str start : シフトの開始時刻。HH:MMで書く。
         :param str end : シフトの終了時刻。HH:MMで書く。
@@ -33,7 +33,7 @@ class Worktime:
             self.end = datetime.datetime.strptime(end, "%H:%M")
         elif type(end) is datetime.datetime:
             self.end = end
-        self.requested = None
+        self.requested = requested
         self.eventid = eventid
 
     def update_start(self, start):
@@ -595,14 +595,12 @@ class DrawShiftImg:
                 for worktime in worker.worktime:
                     worktimePerDay += Shift.count_worktime(worktime)
                     rectApex = self.calc_rect_apices(worktime, rowCounter)
-                    self.drawObj.polygon(
-                        rectApex, fill=colorTable[weekday.index(worker)]
-                    )
-                    if worktime.requested is not None:
-                        requestTime = Shift.count_worktime(worktime.requested)
-                        worktimePerDay -= requestTime
-                        apex = self.calc_rect_apices(worktime.requested, rowCounter)
-                        self.drawObj.polygon(apex, self.LIGHT_GRAY)
+                    if worktime.requested:
+                        self.drawObj.polygon(rectApex, self.LIGHT_GRAY)
+                    else:
+                        self.drawObj.polygon(
+                            rectApex, fill=colorTable[weekday.index(worker)]
+                        )
 
                 else:
                     if timepos == "rect":
