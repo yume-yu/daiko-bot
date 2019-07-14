@@ -91,24 +91,38 @@ class ConnectGoogle:
         nearly_monday = target - diff_to_monday
         return nearly_monday
 
+    def convert_event_to_worker(self, event) -> Worker:
+        if not event:
+            return None
+
+        worker_name: str = ""
+        requested = False
+        if re.search(r"-代行", str(event["summary"])):
+            worker_name = re.sub(r"-代行", "", str(event["summary"]))
+            requested = True
+        else:
+            worker_name = str(event["summary"])
+        work_start = dt.datetime.fromisoformat(event["start"]["dateTime"])
+        work_end = dt.datetime.fromisoformat(event["end"]["dateTime"])
+        eventid = event["id"]
+        new_worker = Worker(
+            worker_name,
+            [Worktime(work_start, work_end, eventid=eventid, requested=requested)],
+        )
+        return new_worker
+
     def generate_shift_aday(self, events: list):
+        if not events:
+            return None
 
         day = []
-        for worker in events:
-            worker_name = str(worker["summary"])
-            work_start = dt.datetime.fromisoformat(worker["start"]["dateTime"])
-            work_end = dt.datetime.fromisoformat(worker["end"]["dateTime"])
-            eventid = worker["id"]
-            worker_index = Shift.has_worker(worker_name, day)
+        for event in events:
+            new_worker = self.convert_event_to_worker(event)
+            worker_index = Shift.has_worker(new_worker.name, day)
             if worker_index is not None:
-                day[worker_index].append_worktime(
-                    Worktime(work_start, work_end, eventid=eventid)
-                )
+                day[worker_index].append_worktime(new_worker.worktime[0])
             else:
-                new_worker_obj = Worker(
-                    worker_name, [Worktime(work_start, work_end, eventid=eventid)]
-                )
-                day.append(new_worker_obj)
+                day.append(new_worker)
 
         weekday = Shift.WORKDAYS[day[0].worktime[0].start.weekday()]
         day = {weekday: day}
