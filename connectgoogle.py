@@ -182,6 +182,17 @@ class ConnectGoogle:
         )
         return updated_event
 
+    def get_schedule(self, eventid: str):
+        try:
+            target_schedule = (
+                self.service.events()
+                .get(calendarId=CALENDERID, eventId=eventid)
+                .execute()
+            )
+        except g_errors.HttpError:
+            target_schedule = None
+        return target_schedule
+
     def get_day_shift(self, date: dt.datetime = None):
 
         if not date:
