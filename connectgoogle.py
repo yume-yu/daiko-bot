@@ -1,4 +1,4 @@
-from __future__ import print_function
+grom __future__ import print_function
 
 import datetime as dt
 import os.path
@@ -164,12 +164,15 @@ class ConnectGoogle:
         )
         return self.generate_shift_aday([event])
 
-    def update_schedule(self, eventid: str, start: dt.datetime, end: dt.datetime):
+    def update_schedule(
+        self, eventid: str, summary: str, start: dt.datetime, end: dt.datetime
+    ):
         start = start.astimezone(timezone(TIMEZONE)).isoformat()
         end = end.astimezone(timezone(TIMEZONE)).isoformat()
         event = (
             self.service.events().get(calendarId=CALENDERID, eventId=eventid).execute()
         )
+        event["summary"] = summary
         event["start"]["dateTime"] = start
         event["end"]["dateTime"] = end
         updated_event = (
