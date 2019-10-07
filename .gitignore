@@ -3,3 +3,5 @@
 static/img/shiftimage-*.jpg
 token*
 client_secret.json
+*.jpg
+*.png
