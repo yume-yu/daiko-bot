@@ -1,10 +1,8 @@
 from __future__ import print_function
 
-import base64
 import datetime as dt
 import json
-import os.path
-import pickle
+import os
 import re
 import sys
 from pprint import pprint
@@ -12,22 +10,22 @@ from pprint import pprint
 import googleapiclient.errors as g_errors
 from apiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from pytz import timezone
 
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
-# If modifying these scopes, delete the file token.pickle.
+CLIENT_SECRET_JSON = json.loads(os.environ["CLIENT_SECRET_JSON"])["installed"]
+REFRESH_TOKEN = os.environ["REFRESH_TOKEN"]
+CLIENT_ID = CLIENT_SECRET_JSON["client_id"]
+CLIENT_SECRET = CLIENT_SECRET_JSON["client_secret"]
 SCOPES = [
     "https://www.googleapis.com/auth/calendar",
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
-CLIENT_SECRET = "./client_secret.json"
-CLIENT_CONFIG = os.environ["CLIENT_CONFIG"]
-TOKEN_B64 = os.environ["TOKEN_B64"].encode("utf-8")
-TOKEN_FILENAME = "token.pickle"
+TOKEN_URI = os.environ["TOKEN_URI"]
 CALENDERID = "primary"
 try:
     CALENDERID = os.environ["CALENDERID"]
@@ -40,49 +38,33 @@ AFTER_CLOSE_TIME = 19
 
 
 class ConnectGoogle:
-    @staticmethod
-    def update_token():
-        creds = pickle.loads(base64.b64decode(TOKEN_B64))
-        # If there are no (valid) credentials available, let the user log in.
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-                print("update or create token.")
-        return creds
-        """
-            token.pickleファイルを使っていた頃の名残
-            else:
-                # flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET, SCOPES)
-                flow = InstalledAppFlow.from_client_config(
-                    json.loads(CLIENT_CONFIG), SCOPES
-                )
-                creds = flow.run_local_server(port=0)
-            # Save the credentials for the next run
-            with open(token_name, "wb") as token:
-                os.environ["TOKEN_B64"] = str(pickle.dumps(creds))
-                """
+    def update_token(self):
+        if not self.creds or not self.creds.valid:
+            self.creds = Credentials(
+                None,
+                refresh_token=REFRESH_TOKEN,
+                client_id=CLIENT_ID,
+                client_secret=CLIENT_SECRET,
+                scopes=SCOPES,
+                token_uri=TOKEN_URI,
+            )
+        self.creds.refresh(Request())
+        print("update or create token.")
+        return self.creds
 
     def connect_google(self):
-        creds = ConnectGoogle.update_token()
-
-        """
-        token.pickleファイルを使っていた頃の名残
-        # 認証トークンがあったらそれを使う
-        if os.path.exists(TOKEN_FILENAME):
-            with open(TOKEN_FILENAME, "rb") as token:
-                creds = pickle.load(token)
-        """
-
+        self.creds = self.update_token()
         # ないor無効なら中断
-        if not creds or not creds.valid:
+        if not self.creds or not self.creds.valid:
             print("Error: no or invalid token.", file=sys.stderr)
             return None
 
         # service = build("calendar", "v3", credentials=creds)
-        service = self.GoogleServices(creds)
+        service = self.GoogleServices(self.creds)
         return service
 
     def __init__(self):
+        self.creds = None
         self.service = self.connect_google()
 
     class GoogleServices:
