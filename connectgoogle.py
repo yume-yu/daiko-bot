@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import base64
 import datetime as dt
 import json
 import os.path
@@ -25,6 +26,7 @@ SCOPES = [
 ]
 CLIENT_SECRET = "./client_secret.json"
 CLIENT_CONFIG = os.environ["CLIENT_CONFIG"]
+TOKEN_B64 = os.environ["TOKEN_B64"].encode("utf-8")
 TOKEN_FILENAME = "token.pickle"
 CALENDERID = "primary"
 try:
@@ -39,17 +41,16 @@ AFTER_CLOSE_TIME = 19
 
 class ConnectGoogle:
     @staticmethod
-    def update_token(token_name):
-        creds = None
-        if os.path.exists(token_name):
-            with open(token_name, "rb") as token:
-                creds = pickle.load(token)
-                if creds.valid:
-                    print("[Valid token]:{}".format(dt.datetime.now()))
+    def update_token():
+        creds = pickle.loads(base64.b64decode(TOKEN_B64))
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
+                print("update or create token.")
+        return creds
+        """
+            token.pickleファイルを使っていた頃の名残
             else:
                 # flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET, SCOPES)
                 flow = InstalledAppFlow.from_client_config(
@@ -58,17 +59,19 @@ class ConnectGoogle:
                 creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
             with open(token_name, "wb") as token:
-                pickle.dump(creds, token)
-                print("update or create token.")
+                os.environ["TOKEN_B64"] = str(pickle.dumps(creds))
+                """
 
     def connect_google(self):
-        creds = None
-        ConnectGoogle.update_token(TOKEN_FILENAME)
+        creds = ConnectGoogle.update_token()
 
+        """
+        token.pickleファイルを使っていた頃の名残
         # 認証トークンがあったらそれを使う
         if os.path.exists(TOKEN_FILENAME):
             with open(TOKEN_FILENAME, "rb") as token:
                 creds = pickle.load(token)
+        """
 
         # ないor無効なら中断
         if not creds or not creds.valid:
