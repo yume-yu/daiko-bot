@@ -1,3 +1,2 @@
-*.json
-!sample.json
 static/img/shiftimage-*.jpg
+.env
