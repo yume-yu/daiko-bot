@@ -1,4 +1,4 @@
-gmport datetime
+import datetime
 import json
 
 from PIL import Image, ImageDraw, ImageFont
