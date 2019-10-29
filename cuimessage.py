@@ -1,13 +1,13 @@
 import datetime as dt
 import json
 import re
-import time
 from enum import Enum, auto
 from pprint import pprint
 
 import requests
-from connectgoogle import TIMEZONE
 from pytz import timezone
+
+from connectgoogle import TIMEZONE
 from shiftcontroller import ShiftController
 from workmanage import Shift
 
@@ -85,6 +85,48 @@ def make_msg(text: str):
         "blocks": [{"type": "section", "text": {"type": "mrkdwn", "text": text}}],
     }
     return message
+
+
+def can_parse_time(time_string: str) -> list:
+    """
+    与えられたstringがHH:MM形式かつもっともらしい時間表記であればdatetime.timeにして返す
+
+    :param str time_string : チェックする文字列
+    """
+    try:
+        return dt.time.fromisoformat(time_string)
+    except ValueError:
+        raise ValueError("{} is Invalid format ".format(time_string))
+
+
+def can_split_times_string(string: str) -> list:
+    """
+    与えられた文字列がHH:MM~HH:MM形式として適切なら2つを分割しlistにして返す
+
+    :param str string : HH:MM~HH:MM形式の文字列
+    """
+
+    # 区切り文字として利用可能なもののタプル
+    TARGET_SEPARATE_SYMBOLS = ("~", "〜")
+    time_list = []
+
+    # 区切れるかをチェック
+    for symbol in TARGET_SEPARATE_SYMBOLS:
+        if symbol in string:
+            time_list = string.split(symbol)
+            break
+
+    # リストが空であるか3つ上の要素に分割できたらエラー
+    if not time_list or len(time_list) > 2:
+        raise ValueError("{} is invalid format".format(string))
+
+    try:
+        for time in time_list:
+            time_list[time_list.index(time)] = can_parse_time(time)
+    except ValueError:
+        raise ValueError("{} is invalid format".format(string))
+
+    return time_list.sort()
 
 
 def can_parse_date(string: str, today: dt):
@@ -271,10 +313,8 @@ def cui_req(args: list, slackId: str):
     # 時間指定オプションを確認
     if args[index] == "-r":
         index += 1
-
-    if index >= 2:
-        time.sleep(5)
-        return make_msg("代行依頼が出されました。")
+        times = args[index].split("~").split("〜")
+        print(times)
 
     return make_msg(REQ_HELPMSG)
 
