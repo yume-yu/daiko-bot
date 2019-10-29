@@ -4,8 +4,9 @@ import sys
 from enum import Enum, auto
 from pprint import pprint
 
-from connectgoogle import TIMEZONE, ConnectGoogle
 from pytz import timezone
+
+from connectgoogle import TIMEZONE, ConnectGoogle
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 FONT = "./.fonts/mplus-1m-regular.ttf"
@@ -149,6 +150,8 @@ class ShiftController:
             return self.DevPos.FRONT
         elif (original.start != request.start) and (original.end == request.end):
             return self.DevPos.BACK
+        elif (original.start > request.start) or (original.end < request.end):
+            raise ValueError("request not include original")
         else:
             return self.DevPos.INCLUDE
 
