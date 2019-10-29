@@ -138,6 +138,29 @@ class ShiftController:
         os.remove(filename)
         return {"url": image_url, "filename": filename}
 
+    def generate_datefix_worktime(
+        self, target: Worktime, start: str, end: str
+    ) -> Worktime:
+        """
+        指定されたtargetと同じ日付かつ指定された労働時間のworktimeを作ります。作成されたworktimeのstart,endはtimezoneの情報をもったdatetimeObjectです。
+
+        :param worktime target: 日付を揃える対象のworktime
+        :param str start: 作成するworktimeの開始時間
+        :param str end: 作成するworktimeの終了時間
+
+        :return Worktime
+        """
+
+        made_obj = Worktime(
+            start=dt.datetime.strptime(
+                " ".join([target.start.strftime("%Y-%m-%d"), start]), "%Y-%m-%d %H:%M"
+            ).astimezone(timezone(TIMEZONE)),
+            end=dt.datetime.strptime(
+                " ".join([target.end.strftime("%Y-%m-%d"), end]), "%Y-%m-%d %H:%M"
+            ).astimezone(timezone(TIMEZONE)),
+        )
+        return made_obj
+
     def check_need_divide(self, original: Worktime, request: Worktime):
         """
         指定された2つのworktimeの位置関係を示す
