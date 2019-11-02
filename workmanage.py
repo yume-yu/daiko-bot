@@ -209,7 +209,7 @@ class Shift:
         for day in self.shift:
             for worker in day:
                 for time in worker.worktime:
-                    if time.requested is not None:
+                    if time.requested:
                         shift_list.append(Worker(name=worker.name, times=[time]))
         return shift_list
 
