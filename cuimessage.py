@@ -65,6 +65,22 @@ REQ_HELPMSG = "\n".join(
         ">\t\t */d req 2umeidsspou2h1sj16d54464e7 体調不良のため代行お願いします*",
     ]
 )
+CON_HELPMSG = "\n".join(
+    [
+        ">シフトの代行依頼を請け負う",
+        ">",
+        ">usage: */d con <target> [-r <range>] [<comment>]*",
+        ">",
+        ">\t*target* : シフトのeventid",
+        ">",
+        ">\t*range* : 部分的に請け負う場合、代わる時間。 _HH:MM-HH:MM_",
+        ">",
+        ">\t*comment* : シフトに就いてのコメント。特記すべきことがあれば",
+        ">",
+        ">ex:\t */d con 2umeidsspou2h1sj16d54464e7*",
+        ">\t\t */d req 2umeidsspou2h1sj16d54464e7 -r 13:00~14:00*",
+    ]
+)
 IMG_HELPMSG = "\n".join(
     [
         ">シフトの画像を表示する",
@@ -77,6 +93,14 @@ IMG_HELPMSG = "\n".join(
         ">\t\t */d img 10-17* -> 10月17日の週のシフトの画像",
     ]
 )
+
+
+class TimeOverhangError(Exception):
+    pass
+
+
+class InvalidTimeFormatError(Exception):
+    pass
 
 
 def make_msg(text: str):
@@ -130,6 +154,31 @@ def can_split_times_string(string: str) -> list:
     time_list.sort()
 
     return time_list
+
+
+def check_times(target, times: str):
+    try:
+        # 引数の文字列が妥当かを判断
+        target_time = can_split_times_string(times)
+    except ValueError:
+        # 与えられた文字列がHH:MM~HH:MMではない
+        raise InvalidTimeFormatError()
+
+    try:
+        # 代行依頼の分割位置チェックを使って指定された時刻の範囲が妥当かを判断
+        devide = sc.check_need_divide(
+            original=target.worktime[0],
+            request=sc.generate_datefix_worktime(
+                target.worktime[0],
+                "{}:{}".format(target_time[0].hour, target_time[0].minute),
+                "{}:{}".format(target_time[1].hour, target_time[1].minute),
+            ),
+        )
+    except ValueError:
+        # 時刻の範囲がはみ出している
+        raise TimeOverhangError()
+
+    return target_time, devide
 
 
 def can_parse_date(string: str, today: dt):
@@ -394,7 +443,86 @@ def cui_req(args: list, slackId: str):
 
 
 def cui_con(args: list, slackId: str):
-    return None
+    """
+    /d con コマンドの中身
+
+    :param list atgs : ユーザーから与えられた引数
+    :param dict : 投稿する文章を含んだdict
+    """
+    index = 1
+    date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
+    target = None
+    target_time = None
+    comment = ""
+
+    # 1つ目の引数を精査する
+    try:
+        date = can_parse_date(args[index], today)
+        target = sc.get_shift_by_date(date, slackId)
+    except ValueError:
+        try:
+            target = sc.get_shift_by_id(args[index])
+        except (ValueError, KeyError):
+            return make_msg("> Error : targetが無効です。\n" + CON_HELPMSG)
+    except IndexError:
+        return make_msg(CON_HELPMSG)
+
+    if target.worktime[0].requested is False:
+        return make_msg("> Error : 代行依頼がされていないシフトです\n" + CON_HELPMSG)
+
+    # 2番めの引数をチェック
+    index += 1
+    try:
+        # 時間指定オプションを確認
+        if args[index] == "-r":
+            index += 1
+            try:
+                # 引数の文字列が妥当かを判断
+                target_time, _ = check_times(target, args[index])
+            except TimeOverhangError:
+                # 時刻の範囲がはみ出している
+                return make_msg("> Error : 時刻の範囲が不適切です\n" + CON_HELPMSG)
+            except InvalidTimeFormatError:
+                # 与えられた文字列がHH:MM~HH:MMではない
+                return make_msg("> Error : 時刻指定の文字列が不適切です\n" + CON_HELPMSG)
+            except IndexError:
+                return make_msg("> Error : rangeが不正です\n" + CON_HELPMSG)
+
+            # 時間指定を受け取ったので次の引数を参照する
+            index += 1
+    except IndexError:
+        # この位置でIndexErrorならrange指定がないだけなので問題なし
+        pass
+
+    try:
+        # 2番めor4番目とそれ以降の引数をコメントとしてまとめる
+        comment = " ".join(args[index:])
+    except IndexError:
+        # コメントは必須ではないので何もしない
+        pass
+
+        # 代行の開始時間と終了時間を整理
+    start = (
+        target.worktime[0].start.strftime("%H:%M")
+        if target_time is None
+        else target_time[0].strftime("%H:%M")
+    )
+    end = (
+        target.worktime[0].end.strftime("%H:%M")
+        if target_time is None
+        else target_time[1].strftime("%H:%M")
+    )
+
+    sc.contract(
+        slackId=slackId, eventId=target.worktime[0].eventid, start=start, end=end
+    )
+    sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.CONTRACT)
+
+    return make_msg(
+        "> 代行依頼を請け負いました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
+            target.worktime[0].start.strftime("%Y-%m-%d"), start, end, comment
+        )
+    )
 
 
 def cui_img(args: list, slackId: str):
