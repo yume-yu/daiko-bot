@@ -387,38 +387,27 @@ def cui_req(args: list, slackId: str):
             index += 1
             try:
                 # 引数の文字列が妥当かを判断
-                target_time = can_split_times_string(args[index])
-            except ValueError:
+                target_time, devide = check_times(target, args[index])
+            except TimeOverhangError:
+                # 時刻の範囲がはみ出している
+                return make_msg("> Error : 時刻の範囲が不適切です\n" + CON_HELPMSG)
+            except InvalidTimeFormatError:
                 # 与えられた文字列がHH:MM~HH:MMではない
-                return make_msg("> Error : 時刻指定の文字列が不適切です\n" + REQ_HELPMSG)
-
-            try:
-                # 代行依頼の分割位置チェックを使って指定された時刻の範囲が妥当かを判断
-                if (
-                    sc.check_need_divide(
-                        original=target.worktime[0],
-                        request=sc.generate_datefix_worktime(
-                            target.worktime[0],
-                            "{}:{}".format(target_time[0].hour, target_time[0].minute),
-                            "{}:{}".format(target_time[1].hour, target_time[1].minute),
-                        ),
-                    )
-                    is sc.DevPos.INCLUDE
-                ):
-                    raise ValueError()
-            except ValueError:
-                # 時刻の範囲がはみ出しているor両端どちらも一致しない
-                return make_msg("> Error : 時刻の範囲が不適切です\n" + REQ_HELPMSG)
+                return make_msg("> Error : 時刻指定の文字列が不適切です\n" + CON_HELPMSG)
+            except IndexError:
+                return make_msg("> Error : rangeが不正です\n" + CON_HELPMSG)
+            if devide is sc.DevPos.INCLUDE:
+                # 時刻の範囲が内包されている
+                return make_msg("> Error : 時刻の範囲が不適切です\n" + CON_HELPMSG)
 
             # 時間指定を受け取ったので次の引数を参照する
             index += 1
 
         # 2番めor4番目の引数をcheck
         if args[index]:
-            for pos in range(index, len(args)):
-                comment = " ".join([comment, args[pos]])
+            comment = " ".join(args[index:])
     except IndexError:
-        return make_msg("> Error : rangeが不正 もしくは commentが足りません\n" + REQ_HELPMSG)
+        return make_msg("> Error : commentがありません\n" + REQ_HELPMSG)
 
         # 代行の開始時間と終了時間を整理
     start = (
@@ -436,7 +425,7 @@ def cui_req(args: list, slackId: str):
     sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.REQUEST)
 
     return make_msg(
-        "> 代行依頼が提出されました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
+        "> 代行を依頼しました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
             target.worktime[0].start.strftime("%Y-%m-%d"), start, end, comment
         )
     )
@@ -519,7 +508,7 @@ def cui_con(args: list, slackId: str):
     sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.CONTRACT)
 
     return make_msg(
-        "> 代行依頼を請け負いました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
+        "> 代行を請け負いました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
             target.worktime[0].start.strftime("%Y-%m-%d"), start, end, comment
         )
     )
