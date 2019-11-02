@@ -9,7 +9,7 @@ from pytz import timezone
 
 from connectgoogle import TIMEZONE
 from shiftcontroller import ShiftController
-from workmanage import Shift
+from workmanage import Shift, Worktime
 
 sc = ShiftController()
 
@@ -87,7 +87,7 @@ def make_msg(text: str):
     return message
 
 
-def can_parse_time(time_string: str) -> list:
+def can_parse_time(time_string: str) -> str:
     """
     与えられたstringがHH:MM形式かつもっともらしい時間表記であればdatetime.timeにして返す
 
@@ -104,6 +104,7 @@ def can_split_times_string(string: str) -> list:
     与えられた文字列がHH:MM~HH:MM形式として適切なら2つを分割しlistにして返す
 
     :param str string : HH:MM~HH:MM形式の文字列
+    :return list: datetime.time のリスト
     """
 
     # 区切り文字として利用可能なもののタプル
@@ -126,7 +127,9 @@ def can_split_times_string(string: str) -> list:
     except ValueError:
         raise ValueError("{} is invalid format".format(string))
 
-    return time_list.sort()
+    time_list.sort()
+
+    return time_list
 
 
 def can_parse_date(string: str, today: dt):
@@ -166,6 +169,7 @@ def parse_shift2strlist(shift_list: list, need_name: bool):
     return_str = ""
     for shift in shift_list:
         name = shift.name if need_name else ""
+        requested = "[依頼済]"
         for worktime in shift.worktime:
             date = worktime.start.strftime("%m-%d")
             weekday = Shift.WORKDAYS_JP[worktime.start.weekday()]
@@ -173,7 +177,19 @@ def parse_shift2strlist(shift_list: list, need_name: bool):
             start = worktime.start.strftime("%H:%M")
             end = worktime.end.strftime("%H:%M")
             eventid = worktime.eventid
-            return_str += " ".join(["> *", name, date, start, "~", end, eventid, "\n"])
+            return_str += " ".join(
+                [
+                    "> *",
+                    name,
+                    date,
+                    start,
+                    "~",
+                    end,
+                    eventid,
+                    requested if worktime.requested else "",
+                    "\n",
+                ]
+            )
     return return_str
 
 
@@ -262,6 +278,7 @@ def cui_ls(args: list, slackId: str):
         shift_list = sc.shift
     elif list_type is ListType.REQUESTED:
         shift_list = sc.get_requested_shift(date.strftime("%Y-%m-%d"))
+        pprint(shift_list)
         shift_list = "".join(
             [
                 "> ",
@@ -282,7 +299,7 @@ def cui_ls(args: list, slackId: str):
             ]
         )
 
-    return make_msg(shift_list)
+    return make_msg(str(list_type) + "\n" + shift_list)
 
 
 def cui_req(args: list, slackId: str):
@@ -295,6 +312,8 @@ def cui_req(args: list, slackId: str):
     index = 1
     date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
     target = None
+    target_time = None
+    comment = ""
 
     # 1つ目の引数を精査する
     try:
@@ -304,19 +323,73 @@ def cui_req(args: list, slackId: str):
         try:
             target = sc.get_shift_by_id(args[index])
         except ValueError:
-            return make_msg("> targetが無効です。\n" + REQ_HELPMSG)
+            return make_msg("> Error : targetが無効です。\n" + REQ_HELPMSG)
     except IndexError:
         return make_msg(REQ_HELPMSG)
 
+    if target.worktime[0].requested:
+        return make_msg("> Error : すでに代行依頼が出されたシフトです\n" + REQ_HELPMSG)
+
     # 2番めの引数をチェック
     index += 1
-    # 時間指定オプションを確認
-    if args[index] == "-r":
-        index += 1
-        times = args[index].split("~").split("〜")
-        print(times)
+    try:
+        # 時間指定オプションを確認
+        if args[index] == "-r":
+            index += 1
+            try:
+                # 引数の文字列が妥当かを判断
+                target_time = can_split_times_string(args[index])
+            except ValueError:
+                # 与えられた文字列がHH:MM~HH:MMではない
+                return make_msg("> Error : 時刻指定の文字列が不適切です\n" + REQ_HELPMSG)
 
-    return make_msg(REQ_HELPMSG)
+            try:
+                # 代行依頼の分割位置チェックを使って指定された時刻の範囲が妥当かを判断
+                if (
+                    sc.check_need_divide(
+                        original=target.worktime[0],
+                        request=sc.generate_datefix_worktime(
+                            target.worktime[0],
+                            "{}:{}".format(target_time[0].hour, target_time[0].minute),
+                            "{}:{}".format(target_time[1].hour, target_time[1].minute),
+                        ),
+                    )
+                    is sc.DevPos.INCLUDE
+                ):
+                    raise ValueError()
+            except ValueError:
+                # 時刻の範囲がはみ出しているor両端どちらも一致しない
+                return make_msg("> Error : 時刻の範囲が不適切です\n" + REQ_HELPMSG)
+
+            # 時間指定を受け取ったので次の引数を参照する
+            index += 1
+
+        # 2番めor4番目の引数をcheck
+        if args[index]:
+            for pos in range(index, len(args)):
+                comment = " ".join([comment, args[pos]])
+    except IndexError:
+        return make_msg("> Error : rangeが不正 もしくは commentが足りません\n" + REQ_HELPMSG)
+
+        # 代行の開始時間と終了時間を整理
+    start = (
+        target.worktime[0].start.strftime("%H:%M")
+        if target_time is None
+        else target_time[0].strftime("%H:%M")
+    )
+    end = (
+        target.worktime[0].end.strftime("%H:%M")
+        if target_time is None
+        else target_time[1].strftime("%H:%M")
+    )
+
+    sc.request(eventId=target.worktime[0].eventid, start=start, end=end)
+
+    return make_msg(
+        "> 代行依頼が提出されました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
+            target.worktime[0].start.strftime("%Y-%m-%d"), start, end, comment
+        )
+    )
 
 
 def cui_con(args: list, slackId: str):
