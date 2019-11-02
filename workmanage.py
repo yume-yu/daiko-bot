@@ -210,10 +210,7 @@ class Shift:
             for worker in day:
                 for time in worker.worktime:
                     if time.requested is not None:
-                        shift_list.append(
-                            {Shift.WORKDAYS_JP[self.shift.index(day)]: time.to_dict()}
-                        )
-
+                        shift_list.append(Worker(name=worker.name, times=[time]))
         return shift_list
 
     def sort_by_starttime(self):
