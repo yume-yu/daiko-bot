@@ -384,6 +384,7 @@ def cui_req(args: list, slackId: str):
     )
 
     sc.request(eventId=target.worktime[0].eventid, start=start, end=end)
+    sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.REQUEST)
 
     return make_msg(
         "> 代行依頼が提出されました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
