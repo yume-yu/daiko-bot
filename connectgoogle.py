@@ -13,7 +13,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from pytz import timezone
-
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 CLIENT_SECRET_JSON = json.loads(os.environ["CLIENT_SECRET_JSON"])["installed"]
@@ -89,14 +88,16 @@ class ConnectGoogle:
             # print("calender name : calender id")
             calid_list = {}
             for calendar_entry in calendar_list["items"]:
-                calid_list.update({calendar_entry["summary"]: calendar_entry["id"]})
+                calid_list.update(
+                    {calendar_entry["summary"]: calendar_entry["id"]})
                 #  print("{} : {}".format(calendar_entry["summary"], calendar_entry["id"]))
                 pass
             return calid_list
 
         def convert_utc_format(self, target: dt.datetime):
             return_value = (
-                target.astimezone(timezone("UTC")).isoformat().replace("+00:00", "")
+                target.astimezone(
+                    timezone("UTC")).isoformat().replace("+00:00", "")
                 + "Z"
             )
             return return_value
@@ -107,7 +108,8 @@ class ConnectGoogle:
             elif when == "close":
                 return target + dt.timedelta(hours=(AFTER_CLOSE_TIME - target.hour))
             else:
-                print("Error: 'when':{} is wrong value.".format(when), file=sys.stderr)
+                print("Error: 'when':{} is wrong value.".format(
+                    when), file=sys.stderr)
                 return None
 
         def calc_nearly_monday(self, target: dt.datetime):
@@ -131,7 +133,8 @@ class ConnectGoogle:
             eventid = event["id"]
             new_worker = Worker(
                 worker_name,
-                [Worktime(work_start, work_end, eventid=eventid, requested=requested)],
+                [Worktime(work_start, work_end, eventid=eventid,
+                          requested=requested)],
             )
             return new_worker
 
@@ -166,7 +169,8 @@ class ConnectGoogle:
                 # now = date
                 pass
 
-            before_open = self.convert_utc_format(self.calc_opening_hours(date, "open"))
+            before_open = self.convert_utc_format(
+                self.calc_opening_hours(date, "open"))
             after_close = self.convert_utc_format(
                 self.calc_opening_hours(date, "close")
             )
@@ -264,7 +268,8 @@ class ConnectGoogle:
             shift_dict = {}
             nearly_monday = self.calc_nearly_monday(date)
             for count in range(5):
-                aday = self.get_day_shift(nearly_monday + dt.timedelta(days=count))
+                aday = self.get_day_shift(
+                    nearly_monday + dt.timedelta(days=count))
                 if aday is not None:
                     shift_dict.update(aday)
                 else:
@@ -371,6 +376,25 @@ class ConnectGoogle:
             )
             return response
 
+        def update(self, data: list, sheetName: str, date_range: str) -> object:
+            """
+            update data on sheet
+            :param list data : to append data.
+            :param str sheetName : name of target sheet.
+            """
+            body = {"values": [data]}
+            response = (
+                self.service.spreadsheets()
+                .values()
+                .update(
+                    spreadsheetId=SPREADSHEETID,
+                    range="{}!{}".format(sheetName, date_range)
+                    body=body,
+                )
+                .execute()
+            )
+            return response
+
         def get_slackId2name_dict(self, toName=True) -> dict:
             """
             make dict of slack_id ↔ display name
@@ -445,5 +469,6 @@ if __name__ == "__main__":
     # drive = connect.GoogleDrive(connect.service.drive)
     # print(drive.upload4share("sample.jpg", "./sample.jpg", drive.JPEGIMAGE))
     # pprint(spreadsheet.append(["a", "b"], spreadsheet.LOG_SHEET_NAME))
-    ddd = calendar.get_week_shift(dt.datetime.strptime("2019-10-07", "%Y-%m-%d"))
+    ddd = calendar.get_week_shift(
+        dt.datetime.strptime("2019-10-07", "%Y-%m-%d"))
     pprint(Shift.parse_dict(ddd))
