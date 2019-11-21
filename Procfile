@@ -1,2 +1,1 @@
-web: gunicorn main:app --log-file -
-bot: python run_bot.py
+web: gunicorn main:app --log-file - | python run_bot.py
