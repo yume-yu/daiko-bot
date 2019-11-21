@@ -8,6 +8,8 @@ import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
 import interactivemessages
+import make_dict
+from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
 from interactivemessages import csv_to_dict, get_block
 
@@ -284,6 +286,25 @@ def getPost():
     print(request.form["user_id"])
     return_dict = get_block("select_action", slack_id=request.form["user_id"])
     return jsonify(return_dict)
+
+
+@app.route("/event", methods=["GET", "POST"])
+def for_eventapi():
+    message_data = json.loads(request.data.decode())
+
+    # 認証用の処理
+    if message_data.get("challenge"):
+        return message_data["challenge"]
+
+    # tokenの確認
+    if not validate_token(message_data["token"]):
+        return ""
+
+    # thread = Ready_to_responce(request.form)
+    thread = threading.Thread(target=start_chatmessage_process, args=(message_data,))
+    thread.start()
+
+    return ""
 
 
 @app.route("/shiftimg-test", methods=["GET", "POST"])

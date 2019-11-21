@@ -1,4 +1,6 @@
 import datetime as dt
+import json
+import os
 import sys
 from enum import Enum, auto
 from pprint import pprint
@@ -35,12 +37,18 @@ TOKEN_FILTERS_C = [
     TokenCountFilter(att="part_of_speech"),
 ]
 TEMP_CONVERSATION_SHEET = "temp-conversation"
+IM_OPEN = "https://slack.com/api/im.open"
+SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 analyzer = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS
 )
 analyzer_c = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS_C
 )
+header = {
+    "Content-type": "application/json",
+    "Authorization": "Bearer " + SLACK_BOT_TOKEN,
+}
 
 sc = ShiftController()
 
@@ -464,19 +472,20 @@ def check_exist_work(date: dt.datetime, slackid: str, action: sc.Actions):  # ->
         return None
 
 
-def do_action(message, action: sc.Actions, date, time, work, text):
+def do_action(message_data, action: sc.Actions, date, time, work, text):
     # message.reply(" ".join([str(action), str(date), str(time), str(work)]))
+    slackid = message_data["event"]["user"]
     if action is sc.Actions.SHOWSHIFT:
         sc.init_shift(date.strftime("%Y-%m-%d"))
-        message.reply_webapi(
+        sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
             attachments=[
                 {"image_url": sc.generate_shiftimg_url()["url"], "fields": []}
             ],
-            as_user=False,
-            in_thread=True,
+            channel=message_data["event"]["channel"],
+            ts=message_data["event"]["ts"],
         )
-        sc.record_use(message.body["user"], sc.UseWay.CHAT, action)
+        sc.record_use(slackid, sc.UseWay.CHAT, action)
     elif action is sc.Actions.REQUEST:
         if not time:
             time = {"start": work.worktime[0].start, "end": work.worktime[0].end}
@@ -488,26 +497,170 @@ def do_action(message, action: sc.Actions, date, time, work, text):
             time["end"] if type(time["end"]) is str else time["end"].strftime("%H:%M"),
         )
         notice_message = sc.make_notice_message(
-            message.body["user"], action, work, time["start"], time["end"], text
+            slackid, action, work, time["start"], time["end"], text
         )
         sc.post_message(notice_message)
-        sc.record_use(message.body["user"], sc.UseWay.CHAT, action)
+        sc.record_use(slackid, sc.UseWay.CHAT, action)
     elif action is sc.Actions.CONTRACT:
         if not time:
             time = {"start": work.worktime[0].start, "end": work.worktime[0].end}
         sc.contract(
             work.worktime[0].eventid,
-            message.body["user"],
+            slackid,
             time["start"]
             if type(time["start"]) is str
             else time["start"].strftime("%H:%M"),
             time["end"] if type(time["end"]) is str else time["end"].strftime("%H:%M"),
         )
         notice_message = sc.make_notice_message(
-            message.body["user"], action, work, time["start"], time["end"], text
+            slackid, action, work, time["start"], time["end"], text
         )
         sc.post_message(notice_message)
-        sc.record_use(message.body["user"], sc.UseWay.CHAT, action)
+        sc.record_use(slackid, sc.UseWay.CHAT, action)
+
+
+def start_chatmessage_process(message_data: dict):
+    # 必要な情報を抜き出す
+    bot_userid = message_data["authed_users"][0]
+    user_slackid = message_data["event"].get("user")
+    if user_slackid is None:
+        return ""
+    text = message_data["event"]["text"].replace("<@{}>".format(bot_userid), "")
+    ts = message_data["event"]["ts"]
+    received_channel = message_data["event"]["channel"]
+    # DMのチャンネルを取得
+    dm_channel = json.loads(
+        requests.post(
+            IM_OPEN,
+            json=json.loads(
+                json.dumps({"token": SLACK_BOT_TOKEN, "user": user_slackid})
+            ),
+            headers=header,
+        ).text
+    )["channel"]["id"]
+
+    # 処理開始
+    words, words_count = analyze_message(text)
+    action = None
+    dates = []
+    times = []  # {"start":"HH:MM","end":"HH:MM"}
+    works = []
+    giveup_flag = False
+    is_sequence = False
+
+    temp_comversation = get_temp_conversation(user_slackid)
+    if temp_comversation["append_date"] != "None":
+        if dt.datetime.now().astimezone(timezone(TIMEZONE)) - dt.datetime.fromisoformat(
+            temp_comversation["append_date"]
+        ) < dt.timedelta(minutes=10):
+            is_sequence = True
+
+    try:
+        action = decide_action(words_count)
+    except ActionNotFoundError:
+        if is_sequence:
+            action = convert_str2action(temp_comversation["action"])
+        if not action:
+            sc.post_message(
+                "メッセージからアクションが読み取れませんでした。ひょっとして業務外のお話ですか?",
+                channel=dm_channel,
+                ts=ts if message_data["event"]["channel_type"] == "im" else None,
+            )
+            return
+
+    dates = find_target_day(words)
+    if (
+        (
+            len(dates) == 0
+            or (
+                len(dates) == 1
+                and dates[0] - dt.datetime.now().astimezone(timezone(TIMEZONE))
+                < dt.timedelta(minutes=5)
+            )
+        )
+        and temp_comversation["dates"] != "None"
+        and is_sequence
+    ):
+        dates.remove(dates[0])
+        dates.extend(
+            convert2valid_date(string_date)
+            for string_date in temp_comversation["dates"].split(",")
+        )
+    for date in dates:
+        try:
+            work = check_exist_work(date, user_slackid, action)
+            if work:
+                works.extend(work)
+        except ValueError:
+            pass
+
+    # 対象になりうるシフトがあるかどうか
+    if len(works) == 0 and action is not sc.Actions.SHOWSHIFT:
+        sc.post_message(
+            "{}には有効な対象がありません。日付を間違えていませんか?".format(
+                ",".join([date.strftime("%m/%d") for date in dates])
+            ),
+            channel=dm_channel,
+            ts=ts if message_data["event"]["channel_type"] == "im" else None,
+        )
+        giveup_flag = True
+
+    # 時刻を示す文言が文中に存在する時はそれを範囲指定と判断し、範囲を取りworksとの整合性をとる
+    if words.get("時刻") or words.get("名詞"):
+        try:
+            # 1回目でworksとの整合性をとる。
+            works, times = find_target_time(words, works)
+            # 2回目をすると、workが空になった時でもtimesの中身が保たれる
+            works, times = find_target_time(words, works)
+        except ValueError:
+            sc.post_message(
+                "時間の指定があるようですが時間が正確に判別できませんでした。指定する時間をDMで教えて下さい。",
+                channel=dm_channel,
+                ts=ts if message_data["event"]["channel_type"] == "im" else None,
+            )
+            giveup_flag = True
+
+    if giveup_flag:
+        update_temp_conversation(user_slackid, action, dates, times, works, text)
+        return ""
+
+    # worksが1つだけみつかっていて、timesが1つ(範囲が1つみつかった)ないしは0(範囲指定がなかった)とき
+    if (len(works) == 1 and len(times) <= 1) or action is sc.Actions.SHOWSHIFT:
+        do_action(
+            message_data,
+            action,
+            works[0].worktime[0].start if len(works) != 0 else dates[0],
+            times[0] if len(times) == 1 else None,
+            works[0] if len(works) != 0 else None,
+            text,
+        )
+    # workが見つからなかったとき
+    elif len(works) == 0:
+        update_temp_conversation(user_slackid, action, dates, times, works, text)
+        sc.post_message(
+            "日付{}と時間{}に対応するシフトがありませんでした。DMでシフトの日付、必要ならば時間も教えてください".format(
+                ",".join([date.strftime("%Y/%m/%d") for date in dates]),
+                "{}~{}".format(times[0]["start"], times[0]["end"])
+                if len(times) > 0
+                else "指定なし",
+            ),
+            channel=dm_channel,
+            ts=ts if message_data["channel"]["channel_type"] == "im" else None,
+        )
+    elif len(works) >= 2:
+        update_temp_conversation(user_slackid, action, dates, times, works, text)
+        sc.post_message(
+            "対応するシフトが複数見つかりました。DMで日付や時間を教えて貰えれば絞り込めるかもしれません。\n日付:{}\n時間:{}".format(
+                ",".join([date.strftime("%Y/%m/%d") for date in dates]),
+                "{}~{}".format(times[0]["start"], times[0]["end"])
+                if len(times) > 0
+                else "指定なし",
+            ),
+            channel=dm_channel,
+            ts=ts if message_data["channel"]["channel_type"] == "im" else None,
+        )
+
+    return ""
 
 
 if __name__ == "__main__":
