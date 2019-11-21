@@ -4,10 +4,11 @@ import os
 import threading
 from ast import literal_eval
 
-import interactivemessages
 import requests
-from cuimessage import make_msg, ready_to_responce
 from flask import Flask, jsonify, redirect, render_template, request, url_for
+
+import interactivemessages
+from cuimessage import make_msg, ready_to_responce
 from interactivemessages import csv_to_dict, get_block
 
 app = Flask(__name__)
@@ -15,12 +16,10 @@ app = Flask(__name__)
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_VALID_TOKEN = os.environ["SLACK_VALID_TOKEN"]
 ADD_TOKEN = os.environ["ADD_TOKEN"]
-NOTICE_CHANNEL = os.environ["NOTICE_CHANNEL"]
 header = {
     "Content-type": "application/json",
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
 }
-CHAT_POSTMESSAGE = "https://slack.com/api/chat.postMessage"
 
 
 @app.route("/")
@@ -42,21 +41,6 @@ def command():
     thread.start()
 
     return ""
-
-
-def post_message(message: str):
-    res = requests.post(
-        CHAT_POSTMESSAGE,
-        json=json.loads(
-            json.dumps(
-                {"text": message, "channel": NOTICE_CHANNEL, "token": SLACK_BOT_TOKEN}
-            )
-        ),
-        headers=header,
-    )
-    res = json.loads(res.text)
-    print(res)
-    return res["ok"]
 
 
 def validate_token(token: str):
@@ -142,7 +126,7 @@ def validate_contract(responce_data: dict, state: dict) -> list:
     return error_list
 
 
-@app.route("/post-test", methods=["GET", "POST"])
+@app.route("/interactive", methods=["GET", "POST"])
 def check_post():
     get_json = json.loads(request.form["payload"])
     print(json.loads(request.form["payload"]))
@@ -268,8 +252,7 @@ def check_post():
                 else None,
                 slack_id=get_json["user"]["id"],
             )
-            post_message(return_block[1])
-            return_block = return_block[0]
+            return_block = return_block
         elif responce_action["block_id"] == "show_shift":
             return_block = get_block(
                 responce_action["block_id"], slack_id=get_json["user"]["id"]
@@ -291,7 +274,7 @@ def check_post():
     return jsonify({"status": "ok"})
 
 
-@app.route("/post", methods=["GET", "POST"])
+@app.route("/daiko", methods=["GET", "POST"])
 def getPost():
     slack_token = request.form["token"]
     # tokenの確認
