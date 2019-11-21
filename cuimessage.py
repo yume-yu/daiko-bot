@@ -422,6 +422,9 @@ def cui_req(args: list, slackId: str):
     )
 
     sc.request(eventId=target.worktime[0].eventid, start=start, end=end)
+    sc.post_message(
+        sc.make_notice_message(slackId, sc.Actions.REQUEST, target, start, end, comment)
+    )
     sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.REQUEST)
 
     return make_msg(
@@ -504,6 +507,11 @@ def cui_con(args: list, slackId: str):
 
     sc.contract(
         slackId=slackId, eventId=target.worktime[0].eventid, start=start, end=end
+    )
+    sc.post_message(
+        sc.make_notice_message(
+            slackId, sc.Actions.CONTRACT, target, start, end, comment
+        )
     )
     sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.CONTRACT)
 

@@ -1,15 +1,24 @@
 import datetime as dt
+import json
 import os
 import sys
 from enum import Enum, auto
 from pprint import pprint
 
+import requests
 from pytz import timezone
 
 from connectgoogle import TIMEZONE, ConnectGoogle
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 FONT = "./.fonts/mplus-1m-regular.ttf"
+SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
+NOTICE_CHANNEL = os.environ["NOTICE_CHANNEL"]
+header = {
+    "Content-type": "application/json",
+    "Authorization": "Bearer " + SLACK_BOT_TOKEN,
+}
+CHAT_POSTMESSAGE = "https://slack.com/api/chat.postMessage"
 
 
 class ShiftController:
@@ -52,6 +61,24 @@ class ShiftController:
         self.sheet = ConnectGoogle.GoogleSpreadSheet(self.gcon.service.sheet)
         self.shift = None
         self.id2name_dict = self.sheet.get_slackId2name_dict()
+
+    def post_message(self, message: str):
+        res = requests.post(
+            CHAT_POSTMESSAGE,
+            json=json.loads(
+                json.dumps(
+                    {
+                        "text": message,
+                        "channel": NOTICE_CHANNEL,
+                        "token": SLACK_BOT_TOKEN,
+                    }
+                )
+            ),
+            headers=header,
+        )
+        res = json.loads(res.text)
+        print(res)
+        return res["ok"]
 
     def slackid2name(self, slackId: str):
         return self.id2name_dict.get(slackId)
@@ -112,6 +139,31 @@ class ShiftController:
                 return worker_obj
 
         raise ValueError("there is no your work at the date")
+
+    def get_request_by_date(self, date: dt.datetime):  # -> list < Worker >
+        """
+        指定された日付代行依頼をリストにして返す
+
+        :param datetime.datetime date : 探すシフトがある日付
+        :return list<Worker>
+        """
+
+        shifts_in_day = self.calendar.get_day_schedule(date)
+
+        if shifts_in_day is None:
+            raise ValueError("there is no works at the date")
+
+        request_list = []
+
+        for work in shifts_in_day:
+            worker_obj = self.calendar.convert_event_to_worker(work)
+            if worker_obj.worktime[0].requested:
+                request_list.append(worker_obj)
+
+        if len(request_list) == 0:
+            raise ValueError("there is no request at the date")
+        else:
+            return request_list
 
     def get_shift_by_id(self, eventid) -> Worker:
         """
@@ -333,6 +385,29 @@ class ShiftController:
             [date, self.slackid2name(slackId), use_way.value, action.value],
             self.sheet.LOG_SHEET_NAME,
         )
+
+    def make_notice_message(
+        self, slackid: str, action: Actions, work: Worker, start, end, message
+    ):
+        return_message = None
+        if action is self.Actions.CONTRACT:
+            return_message = "<@{user}>さんが<@{origin}>さんのシフトの代行を引き受けました。\n日付 : {date}\n時間 : {start}~{end}\n> {message}".format(
+                user=slackid,
+                date=work.worktime[0].start.strftime("%m/%d"),
+                origin=self.sheet.get_slackId2name_dict(toName=False)[work.name],
+                start=start if type(start) is str else start.strftime("%H:%M"),
+                end=end if type(end) is str else end.strftime("%H:%M"),
+                message=message,
+            )
+        elif action is self.Actions.REQUEST:
+            return_message = "<@{user}>さんがシフトの代行を依頼しました。\n日付 : {date}\n時間 : {start}~{end}\n> {message}".format(
+                user=slackid,
+                date=work.worktime[0].start.strftime("%m/%d"),
+                start=start if type(start) is str else start.strftime("%H:%M"),
+                end=end if type(end) is str else end.strftime("%H:%M"),
+                message=message,
+            )
+        return return_message
 
 
 if __name__ == "__main__":

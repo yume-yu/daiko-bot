@@ -262,19 +262,18 @@ def request_shift(target: dict, slackId: str) -> dict:
         return error_message
     pprint(target)
     sc.request(target["eventid"], target["start"], target["end"])
-    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.REQUEST)
-
-    """
-    message = "<@{}>さんが<@{}>さん {}~{}の代行依頼を引き受けました。\n> {}".format(
-        use_db.exchange(name=name),
-        use_db.exchange(name=target_schedule.name),
-        target["start"],
-        target["end"],
-        target["comment"],
+    sc.post_message(
+        sc.make_notice_message(
+            slackId,
+            sc.Actions.REQUEST,
+            sc.get_shift_by_id(target["eventid"]),
+            target["start"],
+            target["end"],
+            target["comment"],
+        )
     )
-    return (complate_request, message)
-    """
-    return (complate_request, None)
+    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.REQUEST)
+    return complate_request
 
 
 def contract_shift(target: dict, slackId: str) -> dict:
@@ -282,18 +281,18 @@ def contract_shift(target: dict, slackId: str) -> dict:
         return error_message
 
     sc.contract(target["eventid"], slackId, target["start"], target["end"])
-    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.CONTRACT)
-    """
-    message = "<@{}>さんが<@{}>さん {}~{}の代行依頼を引き受けました。\n> {}".format(
-        use_db.exchange(name=name),
-        use_db.exchange(name=target_schedule.name),
-        target["start"],
-        target["end"],
-        target["comment"],
+    sc.post_message(
+        sc.make_notice_message(
+            slackId,
+            sc.Actions.CONTRACT,
+            sc.get_shift_by_id(target["eventid"]),
+            target["start"],
+            target["end"],
+            target["comment"],
+        )
     )
-    return (complate_request, message)
-    """
-    return (complate_request, None)
+    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.CONTRACT)
+    return complate_request
 
 
 def get_shift_image(slackId):
