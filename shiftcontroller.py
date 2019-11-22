@@ -60,7 +60,6 @@ class ShiftController:
         self.drive = ConnectGoogle.GoogleDrive(self.gcon.service.drive)
         self.sheet = ConnectGoogle.GoogleSpreadSheet(self.gcon.service.sheet)
         self.shift = None
-        self.id2name_dict = self.sheet.get_slackId2name_dict()
 
     def post_message(self, message: str):
         res = requests.post(
