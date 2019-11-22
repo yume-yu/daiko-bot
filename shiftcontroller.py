@@ -80,7 +80,7 @@ class ShiftController:
         return res["ok"]
 
     def slackid2name(self, slackId: str):
-        return self.id2name_dict.get(slackId)
+        return self.sheet.get_slackId2name_dict()
 
     def init_shift(self, date: str = None):
         """
