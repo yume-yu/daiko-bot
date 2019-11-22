@@ -19,6 +19,7 @@ header = {
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
 }
 CHAT_POSTMESSAGE = "https://slack.com/api/chat.postMessage"
+LOG_SHEET_NAME =
 
 
 class ShiftController:
@@ -56,7 +57,8 @@ class ShiftController:
 
     def __init__(self):
         self.gcon = ConnectGoogle()
-        self.calendar = ConnectGoogle.GoogleCalendar(self.gcon.service.calendar)
+        self.calendar = ConnectGoogle.GoogleCalendar(
+            self.gcon.service.calendar)
         self.drive = ConnectGoogle.GoogleDrive(self.gcon.service.drive)
         self.sheet = ConnectGoogle.GoogleSpreadSheet(self.gcon.service.sheet)
         self.shift = None
@@ -90,7 +92,8 @@ class ShiftController:
         """
         # dateがNoneなら今日を基準にする
         if date:
-            date = dt.datetime.strptime(date, "%Y-%m-%d").astimezone(timezone(TIMEZONE))
+            date = dt.datetime.strptime(
+                date, "%Y-%m-%d").astimezone(timezone(TIMEZONE))
         try:
             self.shift = Shift.parse_dict(self.calendar.get_week_shift(date))
         except TypeError:
@@ -183,9 +186,11 @@ class ShiftController:
 
         :return str : 画像のurl
         """
-        filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
+        filename = "{}.jpg".format(
+            dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
         DrawShiftImg(self.shift, FONT).makeImage().save(filename, quality=95)
-        image_url = self.drive.upload4share(filename, filename, self.drive.JPEGIMAGE)
+        image_url = self.drive.upload4share(
+            filename, filename, self.drive.JPEGIMAGE)
         os.remove(filename)
         return {"url": image_url, "filename": filename}
 
@@ -204,10 +209,12 @@ class ShiftController:
 
         made_obj = Worktime(
             start=dt.datetime.strptime(
-                " ".join([target.start.strftime("%Y-%m-%d"), start]), "%Y-%m-%d %H:%M"
+                " ".join([target.start.strftime("%Y-%m-%d"), start]
+                         ), "%Y-%m-%d %H:%M"
             ).astimezone(timezone(TIMEZONE)),
             end=dt.datetime.strptime(
-                " ".join([target.end.strftime("%Y-%m-%d"), end]), "%Y-%m-%d %H:%M"
+                " ".join([target.end.strftime("%Y-%m-%d"), end]
+                         ), "%Y-%m-%d %H:%M"
             ).astimezone(timezone(TIMEZONE)),
         )
         return made_obj
@@ -381,7 +388,7 @@ class ShiftController:
         """
         date = dt.datetime.now().astimezone(timezone(TIMEZONE)).strftime("%Y/%m/%d  %X")
         self.sheet.append(
-            [date, self.slackid2name(slackId), use_way.value, action.value],
+            [date, self.slackid2name()[slackId], use_way.value, action.value],
             self.sheet.LOG_SHEET_NAME,
         )
 
@@ -393,7 +400,8 @@ class ShiftController:
             return_message = "<@{user}>さんが<@{origin}>さんのシフトの代行を引き受けました。\n日付 : {date}\n時間 : {start}~{end}\n> {message}".format(
                 user=slackid,
                 date=work.worktime[0].start.strftime("%m/%d"),
-                origin=self.sheet.get_slackId2name_dict(toName=False)[work.name],
+                origin=self.sheet.get_slackId2name_dict(toName=False)[
+                    work.name],
                 start=start if type(start) is str else start.strftime("%H:%M"),
                 end=end if type(end) is str else end.strftime("%H:%M"),
                 message=message,
