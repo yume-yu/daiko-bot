@@ -28,7 +28,7 @@ from chatmessage import *
 # message.react('icon_emoji')  発言者のメッセージにリアクション(スタンプ)する
 #                               文字列中に':'はいらない
 
-SLACK_BOT_TOKEN = os.environ["SLACK_OAUTH_TOKEN"]
+SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 
 
 @respond_to("こんちは")
