@@ -307,7 +307,7 @@ class ShiftController:
         :param str end      : 代行を請け負うする枠の終了時間
         """
         # 対象と依頼内容を比較のためパース
-        name = self.slackid2name(slackId)
+        name = self.slackid2name()[slackId]
         target_schedule = self.calendar.convert_event_to_worker(
             self.calendar.get_schedule(eventId)
         )
