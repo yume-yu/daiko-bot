@@ -6,7 +6,6 @@ from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
 
 import connectgoogle
-import make_dict
 import shiftcontroller
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
@@ -19,7 +18,7 @@ header = {
 sc = shiftcontroller.ShiftController()
 TIMEZONE = connectgoogle.TIMEZONE
 
-TOKENIZER = Tokenizer("daiko-dict")
+TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
 CHAR_FILTERS = [
     RegexReplaceCharFilter(u"：", u":"),
     RegexReplaceCharFilter(u"[\(\)]", u""),
