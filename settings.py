@@ -20,8 +20,8 @@ header = {
 while True:
     try:
         TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
-    except:
-        pass
+    except Exception as e:
+        print(e)
     else:
         break
 
