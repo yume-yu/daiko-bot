@@ -61,19 +61,25 @@ class ShiftController:
         self.sheet = ConnectGoogle.GoogleSpreadSheet(self.gcon.service.sheet)
         self.shift = None
 
-    def post_message(self, message: str):
+    def post_message(
+        self,
+        message: str,
+        channel: str = NOTICE_CHANNEL,
+        ts: str = None,
+        attachments: dict = None,
+    ):
+        post_body = {
+            "text": message,
+            "channel": channel,
+            "token": SLACK_BOT_TOKEN,
+            "as_user": False,
+        }
+        if ts:
+            post_body.update({"thread_ts": ts})
+        if attachments:
+            post_body.update({"attachments": attachments})
         res = requests.post(
-            CHAT_POSTMESSAGE,
-            json=json.loads(
-                json.dumps(
-                    {
-                        "text": message,
-                        "channel": NOTICE_CHANNEL,
-                        "token": SLACK_BOT_TOKEN,
-                    }
-                )
-            ),
-            headers=header,
+            CHAT_POSTMESSAGE, json=json.loads(json.dumps(post_body)), headers=header
         )
         res = json.loads(res.text)
         print(res)

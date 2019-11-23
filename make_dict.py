@@ -5,7 +5,7 @@
 #     うけます 受けます もらいます 貰います
 # 日付フォーマット
 #     MM/DD M月D日 D日
-with open("daiko-dict.csv", "w") as file:
+with open("daiko-dict.csv", "w", encoding="utf-8") as file:
     file.write("代行,キーワード,ダイコウ\n")
     file.write("シフト,キーワード,シフト\n")
     file.write("お願,トリガー-依頼,オネガイ\n")

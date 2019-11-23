@@ -2,24 +2,18 @@ import datetime as dt
 import json
 import os
 import threading
+import time
 from ast import literal_eval
 
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 
-import interactivemessages
+from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
 from interactivemessages import csv_to_dict, get_block
+from settings import *
 
 app = Flask(__name__)
-
-SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
-SLACK_VALID_TOKEN = os.environ["SLACK_VALID_TOKEN"]
-ADD_TOKEN = os.environ["ADD_TOKEN"]
-header = {
-    "Content-type": "application/json",
-    "Authorization": "Bearer " + SLACK_BOT_TOKEN,
-}
 
 
 @app.route("/")
@@ -30,6 +24,7 @@ def show_entries():
 
 @app.route("/cmd", methods=["GET", "POST"])
 def command():
+
     # print(request.form)
 
     # tokenの確認
@@ -128,6 +123,7 @@ def validate_contract(responce_data: dict, state: dict) -> list:
 
 @app.route("/interactive", methods=["GET", "POST"])
 def check_post():
+
     get_json = json.loads(request.form["payload"])
     print(json.loads(request.form["payload"]))
 
@@ -276,6 +272,7 @@ def check_post():
 
 @app.route("/daiko", methods=["GET", "POST"])
 def getPost():
+
     slack_token = request.form["token"]
     # tokenの確認
     if not validate_token(slack_token):
@@ -286,8 +283,35 @@ def getPost():
     return jsonify(return_dict)
 
 
+@app.route("/event", methods=["GET", "POST"])
+def for_eventapi():
+    message_data = json.loads(request.data.decode())
+
+    # 認証用の処理
+    if message_data.get("challenge"):
+        return message_data["challenge"]
+
+    # tokenの確認
+    if not validate_token(message_data["token"]):
+        return ""
+
+    # thread = Ready_to_responce(request.form)
+    thread = threading.Thread(target=start_chatmessage_process, args=(message_data,))
+    thread.start()
+
+    return ""
+
+
 @app.route("/shiftimg-test", methods=["GET", "POST"])
 def img_test():
     print(request.form["user_id"])
     return_dict = get_block("select_action", slack_id=request.form["user_id"])
     return jsonify(return_dict)
+
+
+if __name__ == "__main__":
+
+    def start_app():
+        app.run(debug=True)
+
+    start_app()
