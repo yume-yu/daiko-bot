@@ -10,14 +10,12 @@ from janome.analyzer import Analyzer
 from janome.charfilter import *
 from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
-from memory_profiler import profile
 from pytz import timezone
 
-import make_dict
 from connectgoogle import TIMEZONE
 from shiftcontroller import ShiftController
 
-TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
+TOKENIZER = Tokenizer("daiko-dict", udic_type="simpledic", udic_enc="utf8")
 CHAR_FILTERS = [
     RegexReplaceCharFilter(u"：", u":"),
     RegexReplaceCharFilter(u"[\(\)]", u""),

@@ -5,6 +5,9 @@
 #     うけます 受けます もらいます 貰います
 # 日付フォーマット
 #     MM/DD M月D日 D日
+from janome import sysdic
+from janome.dic import UserDictionary
+
 with open("daiko-dict.csv", "w") as file:
     file.write("代行,キーワード,ダイコウ\n")
     file.write("シフト,キーワード,シフト\n")
@@ -146,3 +149,8 @@ with open("daiko-dict.csv", "w") as file:
     for weekday in ["日", "月", "火", "水", "木", "金", "土"]:
         file.write("{day}曜日,日付-曜日,{day}\n".format(day=weekday))
         file.write("{day}曜,日付-曜日,{day}\n".format(day=weekday))
+
+    user_dict = UserDictionary(
+        "daiko-dict.csv", "utf8", "simpledic", sysdic.connections
+    )
+    user_dict.save("./daiko-dict")
