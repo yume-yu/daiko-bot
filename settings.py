@@ -5,9 +5,9 @@ from janome.charfilter import *
 from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
 
-import connectgoogle
 import make_dict
 import shiftcontroller
+from connectgoogle import TIMEZONE
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_VALID_TOKEN = os.environ["SLACK_VALID_TOKEN"]
@@ -17,7 +17,14 @@ header = {
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
 }
 
-TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
+while True:
+    try:
+        TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
+    except:
+        pass
+    else:
+        break
+
 CHAR_FILTERS = [
     RegexReplaceCharFilter(u"：", u":"),
     RegexReplaceCharFilter(u"[\(\)]", u""),
@@ -42,4 +49,4 @@ analyzer = Analyzer(
 )
 
 sc = shiftcontroller.ShiftController()
-TIMEZONE = connectgoogle.TIMEZONE
+TIMEZONE = TIMEZONE
