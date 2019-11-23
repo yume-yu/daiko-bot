@@ -481,6 +481,7 @@ def start_chatmessage_process(message_data: dict):
     user_slackid = message_data["event"].get("user")
     if user_slackid is None:
         return ""
+    pprint(message_data)
     text = message_data["event"]["text"].replace("<@{}>".format(bot_userid), "")
     ts = message_data["event"]["ts"]
     received_channel = message_data["event"]["channel"]
@@ -520,7 +521,7 @@ def start_chatmessage_process(message_data: dict):
             sc.post_message(
                 "メッセージからアクションが読み取れませんでした。ひょっとして業務外のお話ですか?",
                 channel=dm_channel,
-                ts=ts if message_data["event"]["channel_type"] == "im" else None,
+                ts=ts if message_data["event"].get("channel_type") == "im" else None,
             )
             return
 
@@ -557,7 +558,7 @@ def start_chatmessage_process(message_data: dict):
                 ",".join([date.strftime("%m/%d") for date in dates])
             ),
             channel=dm_channel,
-            ts=ts if message_data["event"]["channel_type"] == "im" else None,
+            ts=ts if message_data["event"].get("channel_type") == "im" else None,
         )
         giveup_flag = True
 
@@ -572,7 +573,7 @@ def start_chatmessage_process(message_data: dict):
             sc.post_message(
                 "時間の指定があるようですが時間が正確に判別できませんでした。指定する時間をDMで教えて下さい。",
                 channel=dm_channel,
-                ts=ts if message_data["event"]["channel_type"] == "im" else None,
+                ts=ts if message_data["event"].get("channel_type") == "im" else None,
             )
             giveup_flag = True
 
@@ -601,7 +602,7 @@ def start_chatmessage_process(message_data: dict):
                 else "指定なし",
             ),
             channel=dm_channel,
-            ts=ts if message_data["channel"]["channel_type"] == "im" else None,
+            ts=ts if message_data["event"].get("channel_type") == "im" else None,
         )
     elif len(works) >= 2:
         update_temp_conversation(user_slackid, action, dates, times, works, text)
@@ -613,7 +614,7 @@ def start_chatmessage_process(message_data: dict):
                 else "指定なし",
             ),
             channel=dm_channel,
-            ts=ts if message_data["channel"]["channel_type"] == "im" else None,
+            ts=ts if message_data["event"].get("channel_type") == "im" else None,
         )
 
     return ""
