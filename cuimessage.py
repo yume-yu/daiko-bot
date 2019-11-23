@@ -7,11 +7,8 @@ from pprint import pprint
 import requests
 from pytz import timezone
 
-from connectgoogle import TIMEZONE
-from shiftcontroller import ShiftController
+from settings import TIMEZONE, sc
 from workmanage import Shift, Worktime
-
-sc = ShiftController()
 
 D_HELPMSG = "\n".join(
     [

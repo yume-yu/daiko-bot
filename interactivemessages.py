@@ -3,10 +3,8 @@ import datetime as dt
 from ast import literal_eval
 from pprint import pprint
 
-from shiftcontroller import ShiftController
+from settings import *
 from workmanage import Shift
-
-sc = ShiftController()
 
 
 def csv_to_dict(state: str) -> dict:
