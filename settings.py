@@ -34,17 +34,11 @@ CHAR_FILTERS = [
     RegexReplaceCharFilter(u"一", u"1"),
 ]
 TOKEN_FILTERS = [POSKeepFilter(["日付", "日付-日", "時刻", "トリガー", "キーワード", "名詞,数"])]
-TOKEN_FILTERS_C = [
-    POSKeepFilter(["日付", "日付-日", "時刻", "トリガー", "キーワード", "名詞,数"]),
-    TokenCountFilter(att="part_of_speech"),
-]
+
 TEMP_CONVERSATION_SHEET = "temp-conversation"
 IM_OPEN = "https://slack.com/api/im.open"
 analyzer = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS
-)
-analyzer_c = Analyzer(
-    char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS_C
 )
 
 sc = shiftcontroller.ShiftController()

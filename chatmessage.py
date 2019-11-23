@@ -97,11 +97,8 @@ def analyze_message(message: str):
                 }
             )
 
-    type_count = {}
-    for token, count in analyzer_c.analyze(message):
-        type_count.update({token.split(",")[0]: count})
     token_list.update({"all": ordered_word_list})
-    return token_list, type_count
+    return token_list
 
 
 def convert_str2action(action: str) -> sc.Actions:
@@ -499,7 +496,7 @@ def start_chatmessage_process(message_data: dict):
     )["channel"]["id"]
 
     # 処理開始
-    words, words_count = analyze_message(text)
+    words = analyze_message(text)
     action = None
     dates = []
     times = []  # {"start":"HH:MM","end":"HH:MM"}
@@ -515,7 +512,7 @@ def start_chatmessage_process(message_data: dict):
             is_sequence = True
 
     try:
-        action = decide_action(words_count)
+        action = decide_action(words)
     except ActionNotFoundError:
         if is_sequence:
             action = convert_str2action(temp_comversation["action"])
