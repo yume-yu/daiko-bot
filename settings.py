@@ -18,7 +18,7 @@ header = {
 sc = shiftcontroller.ShiftController()
 TIMEZONE = connectgoogle.TIMEZONE
 
-TOKENIZER = Tokenizer("daiko-dict", udic_type="simpledic", udic_enc="utf8")
+TOKENIZER = Tokenizer("daiko-dict")
 CHAR_FILTERS = [
     RegexReplaceCharFilter(u"：", u":"),
     RegexReplaceCharFilter(u"[\(\)]", u""),
