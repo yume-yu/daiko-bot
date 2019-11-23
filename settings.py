@@ -6,6 +6,7 @@ from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
 
 import connectgoogle
+import make_dict
 import shiftcontroller
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
