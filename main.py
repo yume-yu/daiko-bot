@@ -285,7 +285,6 @@ def getPost():
 
 @app.route("/event", methods=["GET", "POST"])
 def for_eventapi():
-
     message_data = json.loads(request.data.decode())
 
     # 認証用の処理

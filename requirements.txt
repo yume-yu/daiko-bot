@@ -10,7 +10,7 @@ gunicorn==20.0.0
 httplib2==0.14.0
 idna==2.8
 itsdangerous==1.1.0
-Janome==0.3.10
+-e git+https://github.com/yume-yu/janome.git#egg=Janome==0.3.10.1
 Jinja2==2.10.3
 MarkupSafe==1.1.1
 Pillow==6.2.1

@@ -16,8 +16,6 @@ header = {
     "Content-type": "application/json",
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
 }
-sc = shiftcontroller.ShiftController()
-TIMEZONE = connectgoogle.TIMEZONE
 
 TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
 CHAR_FILTERS = [
@@ -48,3 +46,6 @@ analyzer = Analyzer(
 analyzer_c = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS_C
 )
+
+sc = shiftcontroller.ShiftController()
+TIMEZONE = connectgoogle.TIMEZONE
