@@ -80,7 +80,7 @@ class ShiftController:
         return res["ok"]
 
     def slackid2name(self, slackId: str):
-        return self.sheet.get_slackId2name_dict()
+        return self.sheet.get_slackId2name_dict()[slackId]
 
     def init_shift(self, date: str = None):
         """
@@ -300,7 +300,7 @@ class ShiftController:
         :param str end      : 代行を請け負うする枠の終了時間
         """
         # 対象と依頼内容を比較のためパース
-        name = self.slackid2name()[slackId]
+        name = self.slackid2name(slackId)
         target_schedule = self.calendar.convert_event_to_worker(
             self.calendar.get_schedule(eventId)
         )
@@ -381,7 +381,7 @@ class ShiftController:
         """
         date = dt.datetime.now().astimezone(timezone(TIMEZONE)).strftime("%Y/%m/%d  %X")
         self.sheet.append(
-            [date, self.slackid2name()[slackId], use_way.value, action.value],
+            [date, self.slackid2name(slackId), use_way.value, action.value],
             self.sheet.LOG_SHEET_NAME,
         )
 

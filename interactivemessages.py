@@ -41,7 +41,7 @@ def get_block(
         if not slack_id:
             raise ValueError("in select_action, slack_id must be needed")
         return_block["blocks"][0]["text"]["text"] = "こんにちは{}さん\nようこそシフト代行システムへ".format(
-            sc.slackid2name()["slack_id"]
+            sc.slackid2name(slack_id)
         )
         return return_block
     # 代行依頼のための自分のシフト一覧を作る処理へ
