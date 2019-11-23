@@ -10,8 +10,10 @@ from janome.analyzer import Analyzer
 from janome.charfilter import *
 from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
+from memory_profiler import profile
 from pytz import timezone
 
+import make_dict
 from connectgoogle import TIMEZONE
 from shiftcontroller import ShiftController
 

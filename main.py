@@ -2,16 +2,11 @@ import datetime as dt
 import json
 import os
 import threading
+import time
 from ast import literal_eval
 
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, url_for
-
-import interactivemessages
-import make_dict
-from chatmessage import start_chatmessage_process
-from cuimessage import make_msg, ready_to_responce
-from interactivemessages import csv_to_dict, get_block
 
 app = Flask(__name__)
 
@@ -32,6 +27,8 @@ def show_entries():
 
 @app.route("/cmd", methods=["GET", "POST"])
 def command():
+    from cuimessage import make_msg, ready_to_responce
+
     # print(request.form)
 
     # tokenの確認
@@ -130,6 +127,8 @@ def validate_contract(responce_data: dict, state: dict) -> list:
 
 @app.route("/interactive", methods=["GET", "POST"])
 def check_post():
+    from interactivemessages import csv_to_dict, get_block
+
     get_json = json.loads(request.form["payload"])
     print(json.loads(request.form["payload"]))
 
@@ -278,6 +277,8 @@ def check_post():
 
 @app.route("/daiko", methods=["GET", "POST"])
 def getPost():
+    from interactivemessages import csv_to_dict, get_block
+
     slack_token = request.form["token"]
     # tokenの確認
     if not validate_token(slack_token):
@@ -290,6 +291,8 @@ def getPost():
 
 @app.route("/event", methods=["GET", "POST"])
 def for_eventapi():
+    from chatmessage import start_chatmessage_process
+
     message_data = json.loads(request.data.decode())
 
     # 認証用の処理
@@ -312,3 +315,17 @@ def img_test():
     print(request.form["user_id"])
     return_dict = get_block("select_action", slack_id=request.form["user_id"])
     return jsonify(return_dict)
+
+
+if __name__ == "__main__":
+    from memory_profiler import profile
+
+    @profile
+    def start_app():
+        app.run(debug=True)
+
+    @profile
+    def check():
+        print("check")
+
+    start_app()

@@ -6,6 +6,7 @@ from enum import Enum, auto
 from pprint import pprint
 
 import requests
+from memory_profiler import profile
 from pytz import timezone
 
 from connectgoogle import TIMEZONE, ConnectGoogle
@@ -54,6 +55,7 @@ class ShiftController:
         BACK = auto()
         INCLUDE = auto()
 
+    @profile
     def __init__(self):
         self.gcon = ConnectGoogle()
         self.calendar = ConnectGoogle.GoogleCalendar(self.gcon.service.calendar)
