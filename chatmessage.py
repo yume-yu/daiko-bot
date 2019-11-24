@@ -9,7 +9,8 @@ import requests
 from pytz import timezone
 
 from connectgoogle import TIMEZONE
-from settings import *
+from settings import (IM_OPEN, SLACK_BOT_TOKEN, TEMP_CONVERSATION_SHEET,
+                      analyzer, header, sc)
 
 
 class ActionNotFoundError(Exception):
@@ -433,11 +434,18 @@ def do_action(message_data, action: sc.Actions, date, time, work, text):
     slackid = message_data["event"]["user"]
     if action is sc.Actions.SHOWSHIFT:
         sc.init_shift(date.strftime("%Y-%m-%d"))
+        image = sc.generate_shiftimg_url()
+        if image["url"] is None:
+            while image["url"] is not None:
+                sc.post_message(
+                    "画像のアップロードに問題があったようです:cry:再挑戦しています。",
+                    channel=message_data["event"]["channel"],
+                    ts=message_data["event"]["ts"],
+                )
+                image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
         sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
-            attachments=[
-                {"image_url": sc.generate_shiftimg_url()["url"], "fields": []}
-            ],
+            attachments=[{"image_url": image["url"], "fields": []}],
             channel=message_data["event"]["channel"],
             ts=message_data["event"]["ts"],
         )
