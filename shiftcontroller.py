@@ -1,6 +1,7 @@
 import datetime as dt
 import json
 import os
+import socket
 import sys
 from enum import Enum, auto
 from pprint import pprint
@@ -183,15 +184,21 @@ class ShiftController:
             raise ValueError("invalid eventid")
         return self.calendar.convert_event_to_worker(target)
 
-    def generate_shiftimg_url(self) -> str:
+    def generate_shiftimg_url(self, retry=False, filename: str = None) -> str:
         """
         現在のシフトの画像のurlを返す
 
         :return str : 画像のurl
         """
-        filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
-        DrawShiftImg(self.shift, FONT).makeImage().save(filename, quality=95)
-        image_url = self.drive.upload4share(filename, filename, self.drive.JPEGIMAGE)
+        if not retry:
+            filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
+            DrawShiftImg(self.shift, FONT).makeImage().save(filename, quality=95)
+        try:
+            image_url = self.drive.upload4share(
+                filename, filename, self.drive.JPEGIMAGE
+            )
+        except socket.timeout:
+            return {"url": None, "filename": filename}
         os.remove(filename)
         return {"url": image_url, "filename": filename}
 
