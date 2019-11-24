@@ -438,11 +438,12 @@ def do_action(message_data, action: sc.Actions, date, time, work, text):
         if image["url"] is None:
             while image["url"] is not None:
                 sc.post_message(
-                    "画像のアップロードに問題があったようです:cry:再挑戦しています。",
+                    "画像のアップロードに問題があったようです:cry:\n再挑戦しています。",
                     channel=message_data["event"]["channel"],
                     ts=message_data["event"]["ts"],
                 )
                 image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
+        print(image)
         sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
             attachments=[{"image_url": image["url"], "fields": []}],
