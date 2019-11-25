@@ -278,12 +278,13 @@ def contract_shift(target: dict, slackId: str) -> dict:
     if not target:
         return error_message
 
+    original_work = sc.get_shift_by_id(target["eventid"])
     sc.contract(target["eventid"], slackId, target["start"], target["end"])
     sc.post_message(
         sc.make_notice_message(
             slackId,
             sc.Actions.CONTRACT,
-            sc.get_shift_by_id(target["eventid"]),
+            original_work,
             target["start"],
             target["end"],
             target["comment"],
