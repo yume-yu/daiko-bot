@@ -6,7 +6,7 @@ Flask==1.1.1
 google-api-python-client==1.7.11
 google-auth==1.7.1
 google-auth-httplib2==0.0.3
-gunicorn==20.0.0
+gunicorn==20.0.2
 httplib2==0.14.0
 idna==2.8
 itsdangerous==1.1.0
@@ -20,9 +20,8 @@ pytz==2019.3
 requests==2.22.0
 rsa==4.0
 six==1.13.0
-slackbot==0.5.5
 slacker==0.13.0
 uritemplate==3.0.0
 urllib3==1.25.7
-websocket-client==0.44.0
+websocket-client==0.56.0
 Werkzeug==0.16.0
