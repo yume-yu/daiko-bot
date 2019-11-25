@@ -443,7 +443,7 @@ def do_action(message_data, action: sc.Actions, date, time, work, text):
                     ts=message_data["event"]["ts"],
                 )
                 image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
-        print(image)
+        pprint(image)
         sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
             attachments=[{"image_url": image["url"], "fields": []}],

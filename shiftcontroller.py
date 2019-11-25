@@ -197,7 +197,8 @@ class ShiftController:
             image_url = self.drive.upload4share(
                 filename, filename, self.drive.JPEGIMAGE
             )
-        except socket.timeout:
+        except socket.timeout as e:
+            print(e)
             return {"url": None, "filename": filename}
         os.remove(filename)
         return {"url": image_url, "filename": filename}
