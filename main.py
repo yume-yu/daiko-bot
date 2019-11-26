@@ -1,5 +1,6 @@
 import datetime as dt
 import json
+import logging
 import os
 import threading
 import time
@@ -308,6 +309,11 @@ def img_test():
     return_dict = get_block("select_action", slack_id=request.form["user_id"])
     return jsonify(return_dict)
 
+
+if __name__ != "__main__":
+    gunicorn_logger = logging.getLogger("gunicorn.log")
+    app.logger.handlers = gunicorn_logger.handlers
+    app.logger.setLevel(gunicorn_logger.level)
 
 if __name__ == "__main__":
 

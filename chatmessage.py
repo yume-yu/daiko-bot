@@ -435,14 +435,11 @@ def do_action(message_data, action: sc.Actions, date, time, work, text):
     if action is sc.Actions.SHOWSHIFT:
         sc.init_shift(date.strftime("%Y-%m-%d"))
         image = sc.generate_shiftimg_url()
-        if image["url"] is None:
-            while image["url"] is not None:
-                sc.post_message(
-                    "画像のアップロードに問題があったようです:cry:\n再挑戦しています。",
-                    channel=message_data["event"]["channel"],
-                    ts=message_data["event"]["ts"],
-                )
-                image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
+        try:
+            image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
+        except FileNotFoundError as e:
+            print("ok,upload success.")
+            print(e)
         pprint(image)
         sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),

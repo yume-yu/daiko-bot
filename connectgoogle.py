@@ -17,7 +17,7 @@ from pytz import timezone
 
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
-socket.setdefaulttimeout(30)
+socket.setdefaulttimeout(10)
 CLIENT_SECRET_JSON = json.loads(os.environ["CLIENT_SECRET_JSON"])["installed"]
 REFRESH_TOKEN = os.environ["REFRESH_TOKEN"]
 CLIENT_ID = CLIENT_SECRET_JSON["client_id"]

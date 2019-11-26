@@ -541,6 +541,13 @@ def cui_img(args: list, slackId: str):
         # 日付をもとに画像を作る
     sc.init_shift(date.strftime("%Y-%m-%d"))
     uploaded_file = sc.generate_shiftimg_url()
+    try:
+        uploaded_file = sc.generate_shiftimg_url(
+            retry=True, filename=uploaded_file["filename"]
+        )
+    except FileNotFoundError as e:
+        print("ok,upload success.")
+        print(e)
 
     sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.SHOWSHIFT)
 
