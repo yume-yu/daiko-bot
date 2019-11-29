@@ -601,7 +601,6 @@ def start_chatmessage_process(message_data: dict):
             works[0] if len(works) != 0 else None,
             text if is_sequence == False else temp_comversation["text"],
         )
-        update_temp_conversation(user_slackid)
     # workが見つからなかったとき
     elif len(works) == 0:
         update_temp_conversation(user_slackid, action, dates, times, works, text)
