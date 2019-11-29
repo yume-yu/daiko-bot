@@ -2,6 +2,7 @@ import datetime
 import json
 
 from PIL import Image, ImageDraw, ImageFont
+from pytz import timezone
 
 
 class Worktime:
@@ -710,8 +711,21 @@ class DrawShiftImg:
             )
             timeToPrint += datetime.timedelta(minutes=30)
 
-    def print_workdate(self, font=None):
-        pass
+    def print_generatedate(self, font=None, color=LIGHT_GRAY):
+        if font is None:
+            font = self.font
+        now = datetime.datetime.now().astimezone(timezone("Asia/Tokyo"))
+        now_str = now.strftime("generated at %Y/%m/%d %H:%M")
+
+        img = Image.new("RGB", font.getsize(now_str), DrawShiftImg.WHITE)
+        text_img = ImageDraw.Draw(img)
+        text_img.text((0, 0), now_str, color, font=font)
+        img = img.rotate(90, expand=True)
+        img = img.resize((int(img.size[0] * 0.5), int(img.size[1] * 0.5)))
+        tx, ty = img.size
+        self.image.paste(img, (self.width - tx, 0))
+        del text_img
+        del img
 
     def makeImage(self, empday=None, timepos="None"):
         self.print_worktimerect(timepos)
@@ -719,6 +733,7 @@ class DrawShiftImg:
         self.print_grid()
         self.print_weekseparateline()
         self.print_time()
+        self.print_generatedate()
         return self.image
 
 
