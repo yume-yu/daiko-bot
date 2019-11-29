@@ -38,6 +38,7 @@ def get_temp_conversation(slackid: str) -> dict:
         "dates": all_data[3][target_index],
         "times": all_data[4][target_index],
         "works": all_data[5][target_index],
+        "text": all_data[6][target_index],
     }
     return temp_comversation
 
@@ -45,13 +46,15 @@ def get_temp_conversation(slackid: str) -> dict:
 def update_temp_conversation(
     slackid: str,
     action: sc.Actions = None,
-    dates: list = None,
-    times: list = None,
-    works: list = None,
+    dates: list = [],
+    times: list = [],
+    works: list = [],
     text: str = None,
 ):
     values = [
-        dt.datetime.now().astimezone(timezone(TIMEZONE)).isoformat(),
+        dt.datetime.now().astimezone(timezone(TIMEZONE)).isoformat()
+        if action is not None
+        else str(None),
         str(action),
         ",".join([date.strftime("%m/%d") for date in dates])
         if len(dates) > 0
@@ -67,7 +70,7 @@ def update_temp_conversation(
         ",".join([worktime.eventid for work in works for worktime in work.worktime])
         if len(works) > 0
         else str(None),
-        text,
+        str(text),
     ]
 
     all_data = sc.sheet.get(TEMP_CONVERSATION_SHEET)
@@ -589,14 +592,16 @@ def start_chatmessage_process(message_data: dict):
 
     # worksが1つだけみつかっていて、timesが1つ(範囲が1つみつかった)ないしは0(範囲指定がなかった)とき
     if (len(works) == 1 and len(times) <= 1) or action is sc.Actions.SHOWSHIFT:
+        update_temp_conversation(user_slackid)
         do_action(
             message_data,
             action,
             works[0].worktime[0].start if len(works) != 0 else dates[0],
             times[0] if len(times) == 1 else None,
             works[0] if len(works) != 0 else None,
-            text,
+            text if is_sequence == False else temp_comversation["text"],
         )
+        update_temp_conversation(user_slackid)
     # workが見つからなかったとき
     elif len(works) == 0:
         update_temp_conversation(user_slackid, action, dates, times, works, text)
