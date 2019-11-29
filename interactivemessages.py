@@ -303,13 +303,15 @@ def get_shift_image(slackId):
     return_block = copy.deepcopy(show_shift)
     sc.init_shift()
     uploaded_file = sc.generate_shiftimg_url()
-    try:
-        uploaded_file = sc.generate_shiftimg_url(
-            retry=True, filename=uploaded_file["filename"]
-        )
-    except FileNotFoundError as e:
-        print("ok,upload success.")
-        print(e)
+    while True:
+        try:
+            uploaded_file = sc.generate_shiftimg_url(
+                retry=True, filename=uploaded_file["filename"]
+            )
+        except FileNotFoundError as e:
+            print("ok,upload success.")
+            print(e)
+            break
     return_block["blocks"][0]["image_url"] = "{}".format(uploaded_file["url"])
     return_block["blocks"][0]["title"]["text"] = "{}".format(uploaded_file["filename"])
     sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.SHOWSHIFT)

@@ -438,11 +438,13 @@ def do_action(message_data, action: sc.Actions, date, time, work, text):
     if action is sc.Actions.SHOWSHIFT:
         sc.init_shift(date.strftime("%Y-%m-%d"))
         image = sc.generate_shiftimg_url()
-        try:
-            image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
-        except FileNotFoundError as e:
-            print("ok,upload success.")
-            print(e)
+        while True:
+            try:
+                image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
+            except FileNotFoundError as e:
+                print("ok,upload success.")
+                print(e)
+                break
         pprint(image)
         sc.post_message(
             "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
