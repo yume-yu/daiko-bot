@@ -521,6 +521,26 @@ class DrawShiftImg:
                 color,
                 lineWeight,
             )
+            self.drawObj.text(
+                (
+                    self.rowWidth * (tmpCountRow)
+                    - font.getsize(
+                        self.shift.shift[loopCount][0]
+                        .worktime[0]
+                        .start.strftime("%m/%d")
+                    )[0]
+                    - (font.getsize(" ")[0]) / 2,
+                    self.columnHeight * (self.needColumns + 3)
+                    - font.getsize(
+                        self.shift.shift[loopCount][0]
+                        .worktime[0]
+                        .start.strftime("%m/%d")
+                    )[1],
+                ),
+                self.shift.shift[loopCount][0].worktime[0].start.strftime("%m/%d"),
+                color,
+                font,
+            )
 
     def print_names(self, font=None, boldFont=None, weekday=None):
         if font is None:
@@ -689,6 +709,9 @@ class DrawShiftImg:
                 font,
             )
             timeToPrint += datetime.timedelta(minutes=30)
+
+    def print_workdate(self, font=None):
+        pass
 
     def makeImage(self, empday=None, timepos="None"):
         self.print_worktimerect(timepos)
