@@ -16,6 +16,8 @@ with open("daiko-dict.csv", "w", encoding="utf-8") as file:
     file.write("貰います,トリガー-請負,モライマス\n")
     file.write("みせ,トリガー-確認,ミセ\n")
     file.write("見せ,トリガー-確認,ミセ\n")
+    file.write("教え,トリガー-確認,オシエ\n")
+    file.write("おしえ,トリガー-確認,オシエ\n")
     file.write("明日,日付-曖昧,アシタ\n")
     file.write("今日,日付-曖昧,キョウ\n")
     file.write("本日,日付-曖昧,ホンジツ\n")
