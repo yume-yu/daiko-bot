@@ -445,36 +445,22 @@ class DrawShiftImg:
 
     def print_grid(self, lineWeight=gridLineWeight, color=LIGHT_GRAY):
         # 縦線の描画
-        for row in range(2, self.needRows - 1):
-            self.drawObj.line(
-                [
-                    (self.rowWidth * row, self.columnHeight),
-                    (self.rowWidth * row, self.height - self.columnHeight),
-                ],
-                color,
-                lineWeight,
-            )
-        # 罫線の描画
-        self.drawObj.line(
-            [
-                (self.rowWidth * 2, self.columnHeight),
-                (self.rowWidth * (self.needRows - 2), self.columnHeight),
-            ],
-            color,
-            lineWeight,
+        coor_gen = CoordinateGenerator4DrawGrid(
+            (self.rowWidth * 2, self.heightOffset + 2 * self.columnHeight),
+            self.rowWidth,
+            self.columnHeight,
+            self.needRows - 4,
+            self.needColumns - 3,
         )
-        for column in range(2, self.needColumns):
-            self.drawObj.line(
-                [
-                    (self.rowWidth * 2, self.heightOffset + self.columnHeight * column),
-                    (
-                        self.rowWidth * (self.needRows - 2),
-                        self.heightOffset + self.columnHeight * column,
-                    ),
-                ],
-                color,
-                lineWeight,
-            )
+        self.drawObj.line([coordinate for coordinate in coor_gen], color, lineWeight)
+        coor_gen = CoordinateGenerator4DrawGrid(
+            (self.rowWidth * 2, self.columnHeight),
+            self.rowWidth,
+            self.heightOffset + self.columnHeight,
+            self.needRows - 4,
+            1,
+        )
+        self.drawObj.line([coordinate for coordinate in coor_gen], color, lineWeight)
 
     def print_weekseparateline(
         self,
@@ -551,27 +537,27 @@ class DrawShiftImg:
         if weekday is None:
             weekday = datetime.datetime.now().strftime("%a")
         """
-        weekday = Shift.exchange_weekdayname(weekday)
-        weekdaylist = []
-        print(Shift.WORKDAYS[0])
-        weekdaylist.extend(
-            [Shift.WORKDAYS[0]
-                for i in self.shift[Shift.WORKDAYS[0]]["worker"]]
-        ).extend(
-            [Shift.WORKDAYS[1]
-                for i in self.shift[Shift.WORKDAYS[1]]["worker"]]
-        ).extend(
-            [Shift.WORKDAYS[2]
-                for i in self.shift[Shift.WORKDAYS[2]]["worker"]]
-        ).extend(
-            [Shift.WORKDAYS[3]
-                for i in self.shift[Shift.WORKDAYS[3]]["worker"]]
-        ).extend(
-            [Shift.WORKDAYS[4]
-                for i in self.shift[Shift.WORKDAYS[4]]["worker"]]
-        )
-        print(weekdaylist)
-        """
+          weekday = Shift.exchange_weekdayname(weekday)
+          weekdaylist = []
+          print(Shift.WORKDAYS[0])
+          weekdaylist.extend(
+              [Shift.WORKDAYS[0]
+                  for i in self.shift[Shift.WORKDAYS[0]]["worker"]]
+          ).extend(
+              [Shift.WORKDAYS[1]
+                  for i in self.shift[Shift.WORKDAYS[1]]["worker"]]
+          ).extend(
+              [Shift.WORKDAYS[2]
+                  for i in self.shift[Shift.WORKDAYS[2]]["worker"]]
+          ).extend(
+              [Shift.WORKDAYS[3]
+                  for i in self.shift[Shift.WORKDAYS[3]]["worker"]]
+          ).extend(
+              [Shift.WORKDAYS[4]
+                  for i in self.shift[Shift.WORKDAYS[4]]["worker"]]
+          )
+          print(weekdaylist)
+          """
         nameBottomOfiiset = 20
         for (row, name) in enumerate(
             [worker.name for day in self.shift.shift for worker in day]
@@ -735,6 +721,67 @@ class DrawShiftImg:
         self.print_time()
         self.print_generatedate()
         return self.image
+
+
+class CoordinateGenerator4DrawGrid(object):
+    def __init__(
+        self, pos: tuple, cell_width, cell_height, horizonal_count, vertical_count
+    ):
+        """
+        ImageDraw.line()で格子を描画するための座標を生成するイテレーター
+        :param tuple   pos              : 描画したい格子の左上の座標 (x,y)
+        :param number  cell_width       : 格子の1マスの幅
+        :param number  cell_height      : 格子の1マスの高さ
+        :param number  horizonal_count  : 横のマスの数
+        :param number  vertical_count   : 縦のマスの数
+        """
+        self.cell_width = cell_width
+        self.cell_height = cell_height
+        self.horizonal_count = horizonal_count
+        self.vertical_count = vertical_count
+        self.RIGHT = pos[0]
+        self.LEFT = pos[0] + cell_width * horizonal_count
+        self.TOP = pos[1]
+        self.BOTTOM = pos[1] + cell_height * vertical_count
+        self.coords_horizonal = self.coordinates_for_draw_horizonal_line()
+        self.coords_vertical = self.coordinates_for_draw_vertical_line()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return self.coords_horizonal.__next__()
+        except StopIteration:
+            return self.coords_vertical.__next__()
+
+    def coordinates_for_draw_horizonal_line(self):
+        r_or_l = self.right_or_left()
+        for colmun in range(self.vertical_count + 1):
+            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
+            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
+        yield (r_or_l.__next__(), self.TOP)
+        yield (self.RIGHT, self.TOP)
+
+    def coordinates_for_draw_vertical_line(self):
+        t_or_b = self.top_or_bottom()
+        for row in range(self.horizonal_count + 1):
+            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
+            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
+
+    def right_or_left(self):
+        while True:
+            yield self.RIGHT
+            yield self.LEFT
+            yield self.LEFT
+            yield self.RIGHT
+
+    def top_or_bottom(self):
+        while True:
+            yield self.TOP
+            yield self.BOTTOM
+            yield self.BOTTOM
+            yield self.TOP
 
 
 if __name__ == "__main__":
