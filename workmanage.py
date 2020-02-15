@@ -323,18 +323,6 @@ class DrawShiftImg:
     BLACK = (0, 0, 0)
     WHITE = (255, 255, 255)
     LIGHT_GRAY = (125, 125, 125)
-    SHIFTTIME_RECT_COLORS = (
-        (216, 126, 107),
-        (236, 153, 153),
-        (249, 203, 156),
-        (255, 230, 154),
-        (182, 215, 168),
-        (162, 196, 201),
-        (141, 179, 247),
-        (133, 184, 231),
-        (168, 146, 209),
-        (213, 166, 189),
-    )
     HEIGHT = 1026
 
     gridLineWeight = 1
@@ -381,6 +369,22 @@ class DrawShiftImg:
             self.height - self.heightOffset
         ) / self.needColumns  # 名前部分を以外の列の高さ
         self.rowWidth = self.width / self.needRows  # 1列の幅
+
+    def gen_shiftrect_color(self):
+        """
+        シフト表の四角の色を順番に返すジェネレーター
+        """
+        while True:
+            yield (216, 126, 107)
+            yield (236, 153, 153)
+            yield (249, 203, 156)
+            yield (255, 230, 154)
+            yield (182, 215, 168)
+            yield (162, 196, 201)
+            yield (141, 179, 247)
+            yield (133, 184, 231)
+            yield (168, 146, 209)
+            yield (213, 166, 189)
 
     def count_need_row(self, selectedWeekday=None):
         countedRows = 0
@@ -582,29 +586,23 @@ class DrawShiftImg:
                 name,
             )
 
-    def print_worktimerect(
-        self,
-        font=None,
-        colorTable=SHIFTTIME_RECT_COLORS,
-        textColor=BLACK,
-        timepos="None",
-    ):
+    def print_worktimerect(self, font=None, textColor=BLACK, timepos="None"):
         if font is None:
             font = self.smallFont
         rowCounter = 0
         worktimePerDay = 0
         worktimeTextOffset = 3
         for weekday in self.shift.shift:
+            colorTable = self.gen_shiftrect_color()
             for worker in weekday:
                 for worktime in worker.worktime:
                     worktimePerDay += Shift.count_worktime(worktime)
                     rectApex = self.calc_rect_apices(worktime, rowCounter)
                     if worktime.requested:
+                        colorTable.__next__()
                         self.drawObj.polygon(rectApex, self.LIGHT_GRAY)
                     else:
-                        self.drawObj.polygon(
-                            rectApex, fill=colorTable[weekday.index(worker)]
-                        )
+                        self.drawObj.polygon(rectApex, fill=colorTable.__next__())
 
                 else:
                     if timepos == "rect":
