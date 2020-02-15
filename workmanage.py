@@ -1,5 +1,6 @@
 import datetime
 import json
+from enum import Enum
 
 from PIL import Image, ImageDraw, ImageFont
 from pytz import timezone
@@ -151,15 +152,20 @@ class Shift:
 
     @staticmethod
     def count_worktime(worktime, columnCount=False):
+        """
+        Worktimeクラスから勤務時間に必要な目盛りの数と始点の位置を計算する
+        """
         delta = worktime.end - worktime.start
         hour = int(delta.seconds) / 3600
         if columnCount:
-            diff9th = worktime.start - datetime.timedelta(hours=8)
+            diff9th = worktime.start - datetime.timedelta(hours=9)
             # diff9th = worktime.start - (worktime.start - datetime.timedelta(hours=9))
             startColumn = (
                 int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
             )
-            return {"startColumn": startColumn, "columns": hour * 2}
+            # 勤務時間に加えて、必要な目盛りの数をtupleで返す
+            return (hour * 2, startColumn)
+            # return {"startColumn": startColumn, "columns": hour * 2}
         else:
             return hour * 2
 
@@ -318,6 +324,72 @@ class Shift:
         json.dump(self.shift, exportfile, indent=2, ensure_ascii=False)
 
 
+class CoordinateGenerator4DrawGrid(object):
+    def __init__(
+        self, pos: tuple, cell_width, cell_height, horizonal_count, vertical_count
+    ):
+        """
+        ImageDraw.line()で格子を描画するための座標を生成するイテレーター
+        :param tuple   pos              : 描画したい格子の左上の座標 (x,y)
+        :param number  cell_width       : 格子の1マスの幅
+        :param number  cell_height      : 格子の1マスの高さ
+        :param number  horizonal_count  : 横のマスの数
+        :param number  vertical_count   : 縦のマスの数
+        """
+        self.cell_width = cell_width
+        self.cell_height = cell_height
+        self.horizonal_count = horizonal_count
+        self.vertical_count = vertical_count
+        self.RIGHT = pos[0]
+        self.LEFT = pos[0] + cell_width * horizonal_count
+        self.TOP = pos[1]
+        self.BOTTOM = pos[1] + cell_height * vertical_count
+        self.coords_horizonal = self.coordinates_for_draw_horizonal_line()
+        self.coords_vertical = self.coordinates_for_draw_vertical_line()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            return self.coords_horizonal.__next__()
+        except StopIteration:
+            return self.coords_vertical.__next__()
+
+    def coordinates_for_draw_horizonal_line(self):
+        r_or_l = self.right_or_left()
+        for colmun in range(self.vertical_count + 1):
+            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
+            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
+        yield (r_or_l.__next__(), self.TOP)
+        yield (self.RIGHT, self.TOP)
+
+    def coordinates_for_draw_vertical_line(self):
+        t_or_b = self.top_or_bottom()
+        for row in range(self.horizonal_count + 1):
+            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
+            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
+
+    def right_or_left(self):
+        while True:
+            yield self.RIGHT
+            yield self.LEFT
+            yield self.LEFT
+            yield self.RIGHT
+
+    def top_or_bottom(self):
+        while True:
+            yield self.TOP
+            yield self.BOTTOM
+            yield self.BOTTOM
+            yield self.TOP
+
+
+class ShiftImageDirection(Enum):
+    HORIZONAL = 1
+    VERTICAL = 2
+
+
 class DrawShiftImg:
     FOR_WIDTH_RATIO = 1624 / 38
     BLACK = (0, 0, 0)
@@ -348,6 +420,7 @@ class DrawShiftImg:
         # 罫線を引くためのプロパティ
         self.needColumns = 23  # 名前部分を除いた必要な列数
         self.heightOffset = self.height / 8  # 上部の名前の空間の高さ
+        self.namebox_height = self.height / 8  # 上部の名前の空間の高さ
         self.columnHeight = (
             self.height - self.heightOffset
         ) / self.needColumns  # 名前部分を以外の列の高さ
@@ -395,38 +468,67 @@ class DrawShiftImg:
         else:
             return len(selectedWeekday)
 
-    def calc_rect_apices(self, worktime, row):
-        points = []
-        worktimeColumn = Shift.count_worktime(worktime, columnCount=True)
-        points.append(
-            (
-                self.rowWidth * (2 + row),
-                self.heightOffset + self.columnHeight * worktimeColumn["startColumn"],
-            )
-        )
-        points.append(
-            (
-                self.rowWidth * (2 + row + 1),
-                self.heightOffset + self.columnHeight * worktimeColumn["startColumn"],
-            )
-        )
-        points.append(
-            (
-                self.rowWidth * (2 + row + 1),
-                self.heightOffset
-                + self.columnHeight
-                * (worktimeColumn["startColumn"] + worktimeColumn["columns"]),
-            )
-        )
-        points.append(
-            (
-                self.rowWidth * (2 + row),
-                self.heightOffset
-                + self.columnHeight
-                * (worktimeColumn["startColumn"] + worktimeColumn["columns"]),
-            )
-        )
-        return points
+    def calc_rect_apices(
+        self,
+        worktime: Worktime,
+        base_pos: tuple,
+        line_number: int,
+        cell_width: int,
+        cell_height: int,
+        direction: ShiftImageDirection,
+    ):
+        """
+        シフト時間を表す四角形の頂点の座標を返す
+        :param Worktime Worktime    : 計算対象のシフト
+        :param tuple    base_pos    : 表の左上,基準座標 (x,y)
+        :param int      line_number : いくつ目のシフトなのか
+        :param int      cell_width  : マスの幅
+        :param int      cell_height : マスの高さ
+        :param ShiftImageDirection  direction : シフト画像の伸びる向き
+        """
+        # 就業時間と目盛りの数を計算する
+        need_cell, start_cell = Shift.count_worktime(worktime, columnCount=True)
+
+        if direction == ShiftImageDirection.VERTICAL:
+            return [
+                (
+                    base_pos[0] + cell_width * line_number,
+                    base_pos[1] + cell_height * start_cell,
+                ),
+                (
+                    base_pos[0] + cell_width * line_number,
+                    base_pos[1] + cell_height * (start_cell + need_cell),
+                ),
+                (
+                    base_pos[0] + cell_width * (line_number + 1),
+                    base_pos[1] + cell_height * (start_cell + need_cell),
+                ),
+                (
+                    base_pos[0] + cell_width * (line_number + 1),
+                    base_pos[1] + cell_height * start_cell,
+                ),
+            ]
+        elif direction == ShiftImageDirection.HORIZONAL:
+            return [
+                (
+                    base_pos[0] + cell_width * start_cell,
+                    base_pos[1] + cell_height * line_number,
+                ),
+                (
+                    base_pos[0] + cell_width * (start_cell + need_cell),
+                    base_pos[1] + cell_height * line_number,
+                ),
+                (
+                    base_pos[0] + cell_width * (start_cell + need_cell),
+                    base_pos[1] + cell_height * (line_number + 1),
+                ),
+                (
+                    base_pos[0] + cell_width * start_cell,
+                    base_pos[1] + cell_height * (line_number + 1),
+                ),
+            ]
+
+        return None
 
     def write_text_ttb(self, coor, text, font=None):
         if font is None:
@@ -447,7 +549,7 @@ class DrawShiftImg:
                 font=font,
             )
 
-    def print_grid(self, lineWeight=gridLineWeight, color=LIGHT_GRAY):
+    def print_grid_for_week_shift(self, lineWeight=gridLineWeight, color=LIGHT_GRAY):
         # 縦線の描画
         coor_gen = CoordinateGenerator4DrawGrid(
             (self.rowWidth * 2, self.heightOffset + 2 * self.columnHeight),
@@ -597,7 +699,14 @@ class DrawShiftImg:
             for worker in weekday:
                 for worktime in worker.worktime:
                     worktimePerDay += Shift.count_worktime(worktime)
-                    rectApex = self.calc_rect_apices(worktime, rowCounter)
+                    rectApex = self.calc_rect_apices(
+                        worktime,
+                        (self.rowWidth * 2, self.heightOffset + 2 * self.columnHeight),
+                        rowCounter,
+                        self.rowWidth,
+                        self.columnHeight,
+                        ShiftImageDirection.VERTICAL,
+                    )
                     if worktime.requested:
                         colorTable.__next__()
                         self.drawObj.polygon(rectApex, self.LIGHT_GRAY)
@@ -711,75 +820,14 @@ class DrawShiftImg:
         del text_img
         del img
 
-    def makeImage(self, empday=None, timepos="None"):
+    def make_week_shiftimage(self, empday=None, timepos="None"):
         self.print_worktimerect(timepos)
         self.print_names()
-        self.print_grid()
+        self.print_grid_for_week_shift()
         self.print_weekseparateline()
         self.print_time()
         self.print_generatedate()
         return self.image
-
-
-class CoordinateGenerator4DrawGrid(object):
-    def __init__(
-        self, pos: tuple, cell_width, cell_height, horizonal_count, vertical_count
-    ):
-        """
-        ImageDraw.line()で格子を描画するための座標を生成するイテレーター
-        :param tuple   pos              : 描画したい格子の左上の座標 (x,y)
-        :param number  cell_width       : 格子の1マスの幅
-        :param number  cell_height      : 格子の1マスの高さ
-        :param number  horizonal_count  : 横のマスの数
-        :param number  vertical_count   : 縦のマスの数
-        """
-        self.cell_width = cell_width
-        self.cell_height = cell_height
-        self.horizonal_count = horizonal_count
-        self.vertical_count = vertical_count
-        self.RIGHT = pos[0]
-        self.LEFT = pos[0] + cell_width * horizonal_count
-        self.TOP = pos[1]
-        self.BOTTOM = pos[1] + cell_height * vertical_count
-        self.coords_horizonal = self.coordinates_for_draw_horizonal_line()
-        self.coords_vertical = self.coordinates_for_draw_vertical_line()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            return self.coords_horizonal.__next__()
-        except StopIteration:
-            return self.coords_vertical.__next__()
-
-    def coordinates_for_draw_horizonal_line(self):
-        r_or_l = self.right_or_left()
-        for colmun in range(self.vertical_count + 1):
-            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
-            yield (r_or_l.__next__(), int(self.TOP + colmun * self.cell_height))
-        yield (r_or_l.__next__(), self.TOP)
-        yield (self.RIGHT, self.TOP)
-
-    def coordinates_for_draw_vertical_line(self):
-        t_or_b = self.top_or_bottom()
-        for row in range(self.horizonal_count + 1):
-            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
-            yield (int(self.RIGHT + row * self.cell_width), t_or_b.__next__())
-
-    def right_or_left(self):
-        while True:
-            yield self.RIGHT
-            yield self.LEFT
-            yield self.LEFT
-            yield self.RIGHT
-
-    def top_or_bottom(self):
-        while True:
-            yield self.TOP
-            yield self.BOTTOM
-            yield self.BOTTOM
-            yield self.TOP
 
 
 if __name__ == "__main__":
