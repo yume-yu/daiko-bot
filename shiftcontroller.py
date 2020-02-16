@@ -191,9 +191,7 @@ class ShiftController:
         """
         if not retry:
             filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
-            DrawShiftImg(self.shift, FONT).make_week_shiftimage().save(
-                filename, quality=95
-            )
+            DrawShiftImg(self.shift, FONT).make_shiftimage().save(filename, quality=95)
         try:
             image_url = self.drive.upload4share(
                 filename, filename, self.drive.JPEGIMAGE

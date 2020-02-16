@@ -936,6 +936,9 @@ class DrawShiftImg:
             del img
 
     def print_date(self):
+        if self.direction != ShiftImageDirection.HORIZONAL:
+            raise TypeError("This method only use in HORIZONAL")
+
         str_date = self.shift[0].worktime[0].start.strftime("%m/%d")
         font = self.mediumFont
         self.drawObj.text(
