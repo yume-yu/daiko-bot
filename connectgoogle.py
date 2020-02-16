@@ -112,7 +112,13 @@ class ConnectGoogle:
                 return None
 
         def calc_nearly_monday(self, target: dt.datetime):
-            diff_to_monday = dt.timedelta(days=target.weekday())
+            weekday = target.weekday()
+            if weekday < 5:
+                # 月曜から金曜のとき
+                diff_to_monday = dt.timedelta(days=weekday)
+            else:
+                # 土日
+                diff_to_monday = dt.timedelta(days=-1 * (7 - weekday))
             nearly_monday = target - diff_to_monday
             return nearly_monday
 
@@ -496,8 +502,8 @@ if __name__ == "__main__":
     # drive = connect.GoogleDrive(connect.service.drive)
     # print(drive.upload4share("sample.jpg", "./sample.jpg", drive.JPEGIMAGE))
     # pprint(spreadsheet.append(["a", "b"], spreadsheet.LOG_SHEET_NAME))
-    ddd = calendar.get_week_shift(dt.datetime.strptime("2019-10-17", "%Y-%m-%d"))
+    ddd = calendar.get_week_shift(dt.datetime.strptime("2020-01-17", "%Y-%m-%d"))
     shift = Shift.parse_dict(ddd)
-    shift = ddd["wed"]
+    shift = ddd["fri"]
     make = DrawShiftImg(shift, "./.fonts/mplus-1m-regular.ttf")
     image = make.make_shiftimage().show()
