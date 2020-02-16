@@ -123,6 +123,15 @@ class ShiftController:
         self.init_shift(date)
         return self.shift.get_requested_shift()
 
+    def get_shift_in_a_day(self, date: dt, datetime):
+        """
+        指定された日付のすべてのシフトを返す
+
+        :param str date = None : シフトを探す週の基準の日付。Noneなら実行された時間
+        :return list<Worker>
+        """
+        return self.calendar.get_day_shift(date, use_for_weekshift=False)
+
     def get_shift_by_date(self, date: dt.datetime, slackId: str) -> Worker:
         """
         指定された日付の指定されたユーザーのシフトをWorkerにして返す
