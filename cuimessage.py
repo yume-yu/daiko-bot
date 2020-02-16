@@ -6,7 +6,6 @@ from pprint import pprint
 
 import requests
 from pytz import timezone
-
 from settings import TIMEZONE, sc
 from workmanage import Shift, Worktime
 
@@ -538,9 +537,18 @@ def cui_img(args: list, slackId: str):
     except IndexError:
         pass
 
-        # 日付をもとに画像を作る
-    sc.init_shift(date.strftime("%Y-%m-%d"))
-    uploaded_file = sc.generate_shiftimg_url()
+    index += 1
+
+    # 日付をもとに画像を作る
+    try:
+        if args[index] in ("-w", "-W"):
+            sc.init_shift(date.strftime("%Y-%m-%d"))
+            uploaded_file = sc.generate_shiftimg_url()
+        else:
+            uploaded_file = sc.generate_shiftimg_url(shift=sc.get_shift_in_a_day(date))
+    except IndexError:
+        uploaded_file = sc.generate_shiftimg_url(shift=sc.get_shift_in_a_day(date))
+
     while True:
         try:
             uploaded_file = sc.generate_shiftimg_url(

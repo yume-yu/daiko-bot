@@ -478,7 +478,7 @@ class DrawShiftImg:
             + self.needRows
         )
         self.image = Image.new(
-            "RGBA", (int(self.width), int(self.height)), DrawShiftImg.WHITE
+            "RGB", (int(self.width), int(self.height)), DrawShiftImg.WHITE
         )
         self.drawObj = ImageDraw.Draw(self.image)
         self.cell_size = self.FOR_HEIGHT_RATIO
@@ -936,7 +936,7 @@ class DrawShiftImg:
             del img
 
     def print_date(self):
-        if self.direction != ShiftImageDirection.HORIZONAL:
+        if self.shift_direction != ShiftImageDirection.HORIZONAL:
             raise TypeError("This method only use in HORIZONAL")
 
         str_date = self.shift[0].worktime[0].start.strftime("%m/%d")

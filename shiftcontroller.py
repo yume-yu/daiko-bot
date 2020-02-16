@@ -123,7 +123,7 @@ class ShiftController:
         self.init_shift(date)
         return self.shift.get_requested_shift()
 
-    def get_shift_in_a_day(self, date: dt, datetime):
+    def get_shift_in_a_day(self, date: dt.datetime):
         """
         指定された日付のすべてのシフトを返す
 
