@@ -804,8 +804,9 @@ class DrawShiftImg:
         #     font = self.smallFont
 
         counter = counter_offset
+        color_iter = self.gen_shiftrect_color()
         for worker in shift:
-            color_iter = self.gen_shiftrect_color()
+            color = color_iter.__next__()
             for worktime in worker.worktime:
                 self.draw_worktime_rect(
                     worktime,
@@ -823,7 +824,7 @@ class DrawShiftImg:
                     if self.shift_direction == ShiftImageDirection.VERTICAL
                     else self.cell_size,
                     self.shift_direction,
-                    color_iter.__next__(),
+                    color,
                     font=font,
                 )
             else:
