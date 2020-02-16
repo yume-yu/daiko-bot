@@ -183,15 +183,21 @@ class ShiftController:
             raise ValueError("invalid eventid")
         return self.calendar.convert_event_to_worker(target)
 
-    def generate_shiftimg_url(self, retry=False, filename: str = None) -> str:
+    def generate_shiftimg_url(
+        self, shift=None, retry=False, filename: str = None
+    ) -> str:
         """
         現在のシフトの画像のurlを返す
 
         :return str : 画像のurl
         """
+
+        if shift is None:
+            shift = self.shift
+
         if not retry:
             filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
-            DrawShiftImg(self.shift, FONT).make_shiftimage().save(filename, quality=95)
+            DrawShiftImg(shift, FONT).make_shiftimage().save(filename, quality=95)
         try:
             image_url = self.drive.upload4share(
                 filename, filename, self.drive.JPEGIMAGE
