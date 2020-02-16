@@ -14,7 +14,6 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from pytz import timezone
-
 from workmanage import DrawShiftImg, Shift, Worker, Worktime
 
 socket.setdefaulttimeout(10)
@@ -137,7 +136,7 @@ class ConnectGoogle:
             )
             return new_worker
 
-        def generate_shift_aday(self, events: list):
+        def generate_shift_aday(self, events: list, use_for_weekshift: bool = True):
             """
             error handling
             """
@@ -154,8 +153,34 @@ class ConnectGoogle:
                     day.append(new_worker)
 
             weekday = Shift.WORKDAYS[day[0].worktime[0].start.weekday()]
-            day = {weekday: day}
+            if use_for_weekshift:
+                day = {weekday: day}
             return day
+
+        def check_freebusy(self, date: dt.datetime = None):
+            if self.service is None:
+                return None
+            if not date:
+                date = dt.datetime.now()
+            elif isinstance(date, dt.datetime):
+                # now = date
+                pass
+
+            before_open = self.convert_utc_format(self.calc_opening_hours(date, "open"))
+            after_close = self.convert_utc_format(
+                self.calc_opening_hours(date, "close")
+            )
+
+            body = {
+                "timeMin": before_open,
+                "timeMax": after_close,
+                "timeZone": "Asia/Tokyo",
+                "items": [{"id": CALENDERID}],
+            }
+
+            events_result = self.service.freebusy().query(body=body).execute()
+            print(events_result)
+            return "ok"
 
         def get_day_schedule(self, date: dt.datetime = None):
 
@@ -244,7 +269,9 @@ class ConnectGoogle:
                 target_schedule = None
             return target_schedule
 
-        def get_day_shift(self, date: dt.datetime = None):
+        def get_day_shift(
+            self, date: dt.datetime = None, use_for_weekshift: bool = True
+        ):
 
             if not date:
                 date = dt.datetime.now()
@@ -253,7 +280,7 @@ class ConnectGoogle:
                 pass
 
             events = self.get_day_schedule(date)
-            shit_aday = self.generate_shift_aday(events)
+            shit_aday = self.generate_shift_aday(events, use_for_weekshift)
             return shit_aday
 
         def get_week_shift(self, date: dt.datetime = None):
@@ -467,5 +494,8 @@ if __name__ == "__main__":
     # drive = connect.GoogleDrive(connect.service.drive)
     # print(drive.upload4share("sample.jpg", "./sample.jpg", drive.JPEGIMAGE))
     # pprint(spreadsheet.append(["a", "b"], spreadsheet.LOG_SHEET_NAME))
-    ddd = calendar.get_week_shift(dt.datetime.strptime("2019-10-07", "%Y-%m-%d"))
-    pprint(Shift.parse_dict(ddd))
+    ddd = calendar.get_week_shift(dt.datetime.strptime("2019-10-17", "%Y-%m-%d"))
+    shift = Shift.parse_dict(ddd)
+    shift = ddd["wed"]
+    make = DrawShiftImg(shift, "./.fonts/mplus-1m-regular.ttf")
+    image = make.make_shiftimage().show()
