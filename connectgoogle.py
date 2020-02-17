@@ -27,9 +27,12 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 TOKEN_URI = os.environ["TOKEN_URI"]
-CALENDERID = "primary"
+CALENDARID = "primary"
 try:
-    CALENDERID = os.environ["CALENDERID"]
+    CALENDARID = os.environ["CALENDARID_SHIFT"]
+    CALENDARID_SHIFT = os.environ["CALENDARID_SHIFT"]
+    CALENDARID_DAIKO = os.environ["CALENDARID_DAIKO"]
+    CALENDARID_OPEN = os.environ["CALENDARID_OPEN"]
 except KeyError:
     pass
 TIMEZONE = "Asia/Tokyo"
@@ -181,12 +184,11 @@ class ConnectGoogle:
                 "timeMin": before_open,
                 "timeMax": after_close,
                 "timeZone": "Asia/Tokyo",
-                "items": [{"id": CALENDERID}],
+                "items": [{"id": CALENDARID}],
             }
 
-            events_result = self.service.freebusy().query(body=body).execute()
-            print(events_result)
-            return "ok"
+            result = self.service.freebusy().query(body=body).execute()
+            return result.get("calendars").get(CALENDARID).get("busy")
 
         def get_day_schedule(self, date: dt.datetime = None):
 
@@ -207,7 +209,7 @@ class ConnectGoogle:
             events_result = (
                 self.service.events()
                 .list(
-                    calendarId=CALENDERID,
+                    calendarId=CALENDARID,
                     timeMin=before_open,
                     timeMax=after_close,
                     singleEvents=True,
@@ -226,7 +228,7 @@ class ConnectGoogle:
 
         def delete_schedule(self, eventid):
             self.service.events().delete(
-                calendarId=CALENDERID, eventId=eventid
+                calendarId=CALENDARID, eventId=eventid
             ).execute()
 
         def insert_schedule(self, name: str, start: dt.datetime, end: dt.datetime):
@@ -239,7 +241,7 @@ class ConnectGoogle:
             }
             event = (
                 self.service.events()
-                .insert(calendarId=CALENDERID, body=event)
+                .insert(calendarId=CALENDARID, body=event)
                 .execute()
             )
             return self.generate_shift_aday([event])
@@ -251,7 +253,7 @@ class ConnectGoogle:
             end = end.astimezone(timezone(TIMEZONE)).isoformat()
             event = (
                 self.service.events()
-                .get(calendarId=CALENDERID, eventId=eventid)
+                .get(calendarId=CALENDARID, eventId=eventid)
                 .execute()
             )
             event["summary"] = summary
@@ -259,7 +261,7 @@ class ConnectGoogle:
             event["end"]["dateTime"] = end
             updated_event = (
                 self.service.events()
-                .update(calendarId=CALENDERID, eventId=eventid, body=event)
+                .update(calendarId=CALENDARID, eventId=eventid, body=event)
                 .execute()
             )
             return updated_event
@@ -268,7 +270,7 @@ class ConnectGoogle:
             try:
                 target_schedule = (
                     self.service.events()
-                    .get(calendarId=CALENDERID, eventId=eventid)
+                    .get(calendarId=CALENDARID, eventId=eventid)
                     .execute()
                 )
             except g_errors.HttpError:
