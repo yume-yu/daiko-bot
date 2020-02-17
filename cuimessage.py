@@ -81,12 +81,13 @@ IMG_HELPMSG = "\n".join(
     [
         ">シフトの画像を表示する",
         ">",
-        ">usage: */d img [<date>]*",
+        ">usage: */d img [<date>] [-w]*",
         ">\t*date* : 表示するシフトの基準の日付",
         ">\t\t_YYYY-mm-dd_ もしくは _mm-dd_",
+        ">\t*-w 生成するシフト画像を一週間分にする*",
         ">",
-        ">ex:\t*/d img* -> 今週のシフトの画像",
-        ">\t\t */d img 10-17* -> 10月17日の週のシフトの画像",
+        ">ex:\t*/d img* -> 今日のシフトの画像",
+        ">\t\t */d img 10-17 -w* -> 10月17日の週のシフトの画像",
     ]
 )
 
@@ -532,12 +533,11 @@ def cui_img(args: list, slackId: str):
     # 引数の1つ目(eventid or date)を検証
     try:
         date = can_parse_date(args[index], today)
+        index += 1
     except ValueError:
         return make_msg(IMG_HELPMSG)
     except IndexError:
         pass
-
-    index += 1
 
     # 日付をもとに画像を作る
     try:
