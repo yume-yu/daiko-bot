@@ -14,7 +14,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from pytz import timezone
-from workmanage import DrawShiftImg, Shift, Worker, Worktime
+from workmanage import DrawShiftImg, Shift, Work, Worker, Worktime
 
 socket.setdefaulttimeout(10)
 CLIENT_SECRET_JSON = json.loads(os.environ["CLIENT_SECRET_JSON"])["installed"]
@@ -27,14 +27,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 TOKEN_URI = os.environ["TOKEN_URI"]
-CALENDARID = "primary"
-try:
-    CALENDARID = os.environ["CALENDARID_SHIFT"]
-    CALENDARID_SHIFT = os.environ["CALENDARID_SHIFT"]
-    CALENDARID_DAIKO = os.environ["CALENDARID_DAIKO"]
-    CALENDARID_OPEN = os.environ["CALENDARID_OPEN"]
-except KeyError:
-    pass
 TIMEZONE = "Asia/Tokyo"
 SPREADSHEETID = "1iung0Vi3DNKOlb_IIV2oYya_0YjUsZaP2oBkjKekvbI"
 BEFORE_OPEN_TIME = 8
@@ -43,20 +35,18 @@ AFTER_CLOSE_TIME = 19
 
 class ConnectGoogle:
     def update_token(self):
-        if not self.creds or not self.creds.valid:
-            self.creds = Credentials(
-                None,
-                refresh_token=REFRESH_TOKEN,
-                client_id=CLIENT_ID,
-                client_secret=CLIENT_SECRET,
-                scopes=SCOPES,
-                token_uri=TOKEN_URI,
-            )
-        self.creds.refresh(Request())
-        print("update or create token.")
-        return self.creds
+        creds = Credentials(
+            None,
+            refresh_token=REFRESH_TOKEN,
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET,
+            scopes=SCOPES,
+            token_uri=TOKEN_URI,
+        )
+        creds.refresh(Request())
+        return creds
 
-    def connect_google(self):
+    def __init__(self):
         self.creds = self.update_token()
         # ないor無効なら中断
         if not self.creds or not self.creds.valid:
@@ -64,25 +54,13 @@ class ConnectGoogle:
             return None
 
         # service = build("calendar", "v3", credentials=creds)
-        service = self.GoogleServices(self.creds)
-        return service
-
-    def __init__(self):
-        self.creds = None
-        self.service = self.connect_google()
-
-    class GoogleServices:
-        """
-        認証情報を一括で持つためのクラス
-        """
-
-        def __init__(self, creds):
-            """
-            :param google.oauth2.credentials.Credentials creds : GoogleAPIの認証情報
-            """
-            self.calendar = build("calendar", "v3", credentials=creds)
-            self.sheet = build("sheets", "v4", credentials=creds)
-            self.drive = build("drive", "v3", credentials=creds)
+        self.calendar = self.GoogleCalendar(
+            build("calendar", "v3", credentials=self.creds)
+        )
+        self.sheet = self.GoogleSpreadSheet(
+            build("sheets", "v4", credentials=self.creds)
+        )
+        self.drive = self.GoogleDrive(build("drive", "v3", credentials=self.creds))
 
     class GoogleCalendar:
         def __init__(self, service):
@@ -98,138 +76,21 @@ class ConnectGoogle:
                 pass
             return calid_list
 
-        def convert_utc_format(self, target: dt.datetime):
-            return_value = (
-                target.astimezone(timezone("UTC")).isoformat().replace("+00:00", "")
-                + "Z"
-            )
-            return return_value
-
-        def calc_opening_hours(self, target: dt.datetime, when: str):
-            if when == "open":
-                return target + dt.timedelta(hours=(BEFORE_OPEN_TIME - target.hour))
-            elif when == "close":
-                return target + dt.timedelta(hours=(AFTER_CLOSE_TIME - target.hour))
-            else:
-                print("Error: 'when':{} is wrong value.".format(when), file=sys.stderr)
-                return None
-
-        def calc_nearly_monday(self, target: dt.datetime):
-            weekday = target.weekday()
-            if weekday < 5:
-                # 月曜から金曜のとき
-                diff_to_monday = dt.timedelta(days=weekday)
-            else:
-                # 土日
-                diff_to_monday = dt.timedelta(days=-1 * (7 - weekday))
-            nearly_monday = target - diff_to_monday
-            return nearly_monday
-
-        def convert_event_to_worker(self, event) -> Worker:
-            if not event:
-                return None
-
-            worker_name: str = ""
-            requested = False
-            if re.search(r"-代行", str(event["summary"])):
-                worker_name = re.sub(r"-代行", "", str(event["summary"]))
-                requested = True
-            else:
-                worker_name = str(event["summary"])
-            work_start = dt.datetime.fromisoformat(event["start"]["dateTime"])
-            work_end = dt.datetime.fromisoformat(event["end"]["dateTime"])
-            eventid = event["id"]
-            new_worker = Worker(
-                worker_name,
-                [Worktime(work_start, work_end, eventid=eventid, requested=requested)],
-            )
-            return new_worker
-
-        def generate_shift_aday(self, events: list, use_for_weekshift: bool = True):
-            """
-            error handling
-            """
-            if not events:
-                return None
-
-            day = []
-            for event in events:
-                new_worker = self.convert_event_to_worker(event)
-                worker_index = Shift.has_worker(new_worker.name, day)
-                if worker_index is not None:
-                    day[worker_index].append_worktime(new_worker.worktime[0])
-                else:
-                    day.append(new_worker)
-
-            weekday = Shift.WORKDAYS[day[0].worktime[0].start.weekday()]
-            if use_for_weekshift:
-                day = {weekday: day}
-            return day
-
-        def check_freebusy(self, date: dt.datetime = None):
+        def check_freebusy(self, calendar: str, search_range: tuple):
             if self.service is None:
                 return None
-            if not date:
-                date = dt.datetime.now()
-            elif isinstance(date, dt.datetime):
-                # now = date
-                pass
-
-            before_open = self.convert_utc_format(self.calc_opening_hours(date, "open"))
-            after_close = self.convert_utc_format(
-                self.calc_opening_hours(date, "close")
-            )
-
             body = {
-                "timeMin": before_open,
-                "timeMax": after_close,
+                "timeMin": search_range[0],
+                "timeMax": search_range[1],
                 "timeZone": "Asia/Tokyo",
-                "items": [{"id": CALENDARID}],
+                "items": [{"id": calendar}],
             }
 
             result = self.service.freebusy().query(body=body).execute()
-            return result.get("calendars").get(CALENDARID).get("busy")
+            return result.get("calendars").get(calendar).get("busy")
 
-        def get_day_schedule(self, date: dt.datetime = None):
-
-            if self.service is None:
-                return None
-
-            if not date:
-                date = dt.datetime.now()
-            elif isinstance(date, dt.datetime):
-                # now = date
-                pass
-
-            before_open = self.convert_utc_format(self.calc_opening_hours(date, "open"))
-            after_close = self.convert_utc_format(
-                self.calc_opening_hours(date, "close")
-            )
-
-            events_result = (
-                self.service.events()
-                .list(
-                    calendarId=CALENDARID,
-                    timeMin=before_open,
-                    timeMax=after_close,
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            )
-
-            events = events_result.get("items", [])
-
-            if not events:
-                print("No upcoming events found.")
-                return None
-            else:
-                return events
-
-        def delete_schedule(self, eventid):
-            self.service.events().delete(
-                calendarId=CALENDARID, eventId=eventid
-            ).execute()
+        def delete_schedule(self, calendar: str, eventid):
+            self.service.events().delete(calendarId=calendar, eventId=eventid).execute()
 
         def insert_schedule(self, name: str, start: dt.datetime, end: dt.datetime):
             start = start.astimezone(timezone(TIMEZONE)).isoformat()
@@ -244,7 +105,7 @@ class ConnectGoogle:
                 .insert(calendarId=CALENDARID, body=event)
                 .execute()
             )
-            return self.generate_shift_aday([event])
+            return event
 
         def update_schedule(
             self, eventid: str, summary: str, start: dt.datetime, end: dt.datetime
@@ -266,62 +127,42 @@ class ConnectGoogle:
             )
             return updated_event
 
-        def get_schedule(self, eventid: str):
+        def get_event(self, calendar: str, eventid: str):
             try:
                 target_schedule = (
                     self.service.events()
-                    .get(calendarId=CALENDARID, eventId=eventid)
+                    .get(calendarId=calendar, eventId=eventid)
                     .execute()
                 )
             except g_errors.HttpError:
                 target_schedule = None
             return target_schedule
 
-        def get_day_shift(
-            self, date: dt.datetime = None, use_for_weekshift: bool = False
-        ):
+        def get_events_in_day(self, calendar: str, search_range: tuple) -> list:
+            """
+            指定された範囲の指定されたGoogleCalendar上のEventを取得してリストで返す。
+            :param tuple search_range : イベントを取得する範囲(始点,終点)
+            """
 
-            if not date:
-                date = dt.datetime.now()
-            elif isinstance(date, dt.datetime):
-                # now = date
-                pass
-
-            events = self.get_day_schedule(date)
-            shit_aday = self.generate_shift_aday(events, use_for_weekshift)
-            return shit_aday
-
-        def get_week_shift(self, date: dt.datetime = None):
-
-            if not date:
-                date = dt.datetime.now().astimezone(timezone(TIMEZONE))
-            elif isinstance(date, dt.datetime):
-                # now = date
-                pass
-            shift_dict = {}
-            nearly_monday = self.calc_nearly_monday(date)
-            for count in range(5):
-                aday = self.get_day_shift(
-                    nearly_monday + dt.timedelta(days=count), use_for_weekshift=True
+            if self.service is None:
+                return None
+            events = (
+                self.service.events()
+                .list(
+                    calendarId=calendar,
+                    timeMin=search_range[0],
+                    timeMax=search_range[1],
+                    singleEvents=True,
+                    orderBy="startTime",
                 )
-                if aday is not None:
-                    shift_dict.update(aday)
-                else:
-                    shift_dict.update(
-                        {
-                            Shift.WORKDAYS[count]: [
-                                Worker(
-                                    name="該当なし",
-                                    times=[
-                                        Worktime(
-                                            start="09:00", end="19:00", requested=True
-                                        )
-                                    ],
-                                )
-                            ]
-                        }
-                    )
-            return shift_dict
+                .execute()
+            ).get("items", [])
+
+            if not events:
+                print("No upcoming events found.")
+                return []
+            else:
+                return events
 
     class GoogleSpreadSheet:
         LOG_SHEET_NAME = "use-logs"
@@ -499,13 +340,5 @@ class ConnectGoogle:
 
 if __name__ == "__main__":
     connect = ConnectGoogle()
-    calendar = connect.GoogleCalendar(connect.service.calendar)
-    # spreadsheet = connect.GoogleSpreadSheet(connect.service.sheet)
-    # drive = connect.GoogleDrive(connect.service.drive)
-    # print(drive.upload4share("sample.jpg", "./sample.jpg", drive.JPEGIMAGE))
-    # pprint(spreadsheet.append(["a", "b"], spreadsheet.LOG_SHEET_NAME))
-    ddd = calendar.get_week_shift(dt.datetime.strptime("2020-01-17", "%Y-%m-%d"))
-    shift = Shift.parse_dict(ddd)
-    shift = ddd["fri"]
-    make = DrawShiftImg(shift, "./.fonts/mplus-1m-regular.ttf")
-    image = make.make_shiftimage().show()
+    calendar = connect.calendar
+    calendar.get_event("5paoo1ji72n2dbdl86o6265h7r_20200121T000000Z")
