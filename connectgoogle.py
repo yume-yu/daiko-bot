@@ -92,34 +92,47 @@ class ConnectGoogle:
         def delete_schedule(self, calendar: str, eventid):
             self.service.events().delete(calendarId=calendar, eventId=eventid).execute()
 
-        def insert_schedule(self, name: str, start: dt.datetime, end: dt.datetime):
+        def insert_schedule(
+            self,
+            calendar: str,
+            name: str,
+            start: dt.datetime,
+            end: dt.datetime,
+            description: str,
+        ):
             start = start.astimezone(timezone(TIMEZONE)).isoformat()
             end = end.astimezone(timezone(TIMEZONE)).isoformat()
             event = {
                 "summary": name,
                 "end": {"dateTime": end, "timeZone": TIMEZONE},
                 "start": {"dateTime": start, "timeZone": TIMEZONE},
+                "description": description,
             }
             event = (
-                self.service.events()
-                .insert(calendarId=CALENDARID, body=event)
-                .execute()
+                self.service.events().insert(calendarId=calendar, body=event).execute()
             )
             return event
 
         def update_schedule(
-            self, eventid: str, summary: str, start: dt.datetime, end: dt.datetime
+            self,
+            calendar: str,
+            eventid: str,
+            summary: str,
+            start: dt.datetime,
+            end: dt.datetime,
+            description: str,
         ):
             start = start.astimezone(timezone(TIMEZONE)).isoformat()
             end = end.astimezone(timezone(TIMEZONE)).isoformat()
             event = (
                 self.service.events()
-                .get(calendarId=CALENDARID, eventId=eventid)
+                .get(calendarId=calendar, eventId=eventid)
                 .execute()
             )
             event["summary"] = summary
             event["start"]["dateTime"] = start
             event["end"]["dateTime"] = end
+            event["description"] = description
             updated_event = (
                 self.service.events()
                 .update(calendarId=CALENDARID, eventId=eventid, body=event)
@@ -341,4 +354,3 @@ class ConnectGoogle:
 if __name__ == "__main__":
     connect = ConnectGoogle()
     calendar = connect.calendar
-    calendar.get_event("5paoo1ji72n2dbdl86o6265h7r_20200121T000000Z")
