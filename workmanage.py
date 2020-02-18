@@ -6,6 +6,44 @@ from PIL import Image, ImageDraw, ImageFont
 from pytz import timezone
 
 
+class Work:
+    def __init__(
+        self,
+        staff_name: str,
+        start: datetime.datetime,
+        end: datetime.datetime,
+        requested: bool,
+        eventid: str,
+        slackid: str,
+    ):
+        """
+        :param str staff_name : スタッフの名前
+        :param datetime.datetime start : シフトの開始時刻
+        :param datetime.datetime end : シフトの終了時刻
+        :param bool requested : このシフトが代行依頼かどうか
+        :param str eventid : このシフトのGoogleCalendar上でのid
+        :param str slackid : 担当スタッフのslackid
+        """
+        self.staff_name = staff_name
+        self.start = start
+        self.end = end
+        self.requested = requested
+        self.eventid = eventid
+        self.slackid = slackid
+
+    def __repr__(self):
+        return str(
+            {
+                "staff_name": self.staff_name,
+                "start": self.start,
+                "end": self.end,
+                "requested": self.requested,
+                "eventid": self.eventid,
+                "slackid": self.slackid,
+            }
+        )
+
+
 class Worktime:
     def _str__(self):
         return_str = f"start:{0} end:{1} requested:{2}".format(
@@ -22,7 +60,7 @@ class Worktime:
         }
         return str(obj_dict)
 
-    def __init__(self, start, end, eventid=None, requested=None):
+    def __init__(self, start, end, eventid=None, requested=None, slack_id=None):
         """
         :param str start : シフトの開始時刻。HH:MMで書く。
         :param str end : シフトの終了時刻。HH:MMで書く。
@@ -37,6 +75,7 @@ class Worktime:
             self.end = end
         self.requested = requested
         self.eventid = eventid
+        self.slack_id = slack_id
 
     def update_start(self, start):
         """
@@ -184,7 +223,7 @@ class Shift:
         raise ValueError("invaild weekday text")
 
     @staticmethod
-    def has_worker(name: str, workers):
+    def has_worker(name: str, workers: list):
         for (index, worker) in enumerate(workers):
             if worker.name == name:
                 return index
