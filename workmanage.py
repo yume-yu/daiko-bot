@@ -35,8 +35,8 @@ class Work:
         return str(
             {
                 "staff_name": self.staff_name,
-                "start": self.start,
-                "end": self.end,
+                "start": self.start.isoformat(),
+                "end": self.end.isoformat(),
                 "requested": self.requested,
                 "eventid": self.eventid,
                 "slackid": self.slackid,
@@ -465,11 +465,11 @@ class DrawShiftImg:
         self.shift_direction = None
 
         # 与えられたシフト情報の型で週のシフトか日のシフトかを判定する
-        if isinstance(self.shift, Shift):
+        if isinstance(self.shift[0], list):
             print("This is Week Shift!")
             self.shift_direction = ShiftImageDirection.VERTICAL
             self.initialize_for_week(kanjiFontPath, kanjiBoldFontPath, fontPath)
-        elif isinstance(self.shift, list) and isinstance(self.shift[0], Worker):
+        elif isinstance(self.shift[0], Work):
             print("This is a Day Shift!")
             self.shift_direction = ShiftImageDirection.HORIZONAL
             self.initialize_for_day(kanjiFontPath, fontPath)

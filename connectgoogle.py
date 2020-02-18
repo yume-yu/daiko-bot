@@ -89,13 +89,13 @@ class ConnectGoogle:
             result = self.service.freebusy().query(body=body).execute()
             return result.get("calendars").get(calendar).get("busy")
 
-        def delete_schedule(self, calendar: str, eventid):
+        def delete_event(self, calendar: str, eventid):
             self.service.events().delete(calendarId=calendar, eventId=eventid).execute()
 
-        def insert_schedule(
+        def insert_event(
             self,
             calendar: str,
-            name: str,
+            summary: str,
             start: dt.datetime,
             end: dt.datetime,
             description: str,
@@ -103,17 +103,23 @@ class ConnectGoogle:
             start = start.astimezone(timezone(TIMEZONE)).isoformat()
             end = end.astimezone(timezone(TIMEZONE)).isoformat()
             event = {
-                "summary": name,
+                "summary": summary,
                 "end": {"dateTime": end, "timeZone": TIMEZONE},
                 "start": {"dateTime": start, "timeZone": TIMEZONE},
                 "description": description,
             }
-            event = (
-                self.service.events().insert(calendarId=calendar, body=event).execute()
-            )
+            try:
+                event = (
+                    self.service.events()
+                    .insert(calendarId=calendar, body=event)
+                    .execute()
+                )
+            except socket.timeout as e:
+                print(e)
+                return self.insert_event(calendar, summary, start, end, description)
             return event
 
-        def update_schedule(
+        def update_event(
             self,
             calendar: str,
             eventid: str,
@@ -133,11 +139,17 @@ class ConnectGoogle:
             event["start"]["dateTime"] = start
             event["end"]["dateTime"] = end
             event["description"] = description
-            updated_event = (
-                self.service.events()
-                .update(calendarId=CALENDARID, eventId=eventid, body=event)
-                .execute()
-            )
+            try:
+                updated_event = (
+                    self.service.events()
+                    .update(calendarId=calendar, eventId=eventid, body=event)
+                    .execute()
+                )
+            except socket.timeout as e:
+                print(e)
+                return self.update_event(
+                    calendar, eventid, summary, start, end, description
+                )
             return updated_event
 
         def get_event(self, calendar: str, eventid: str):
@@ -149,6 +161,9 @@ class ConnectGoogle:
                 )
             except g_errors.HttpError:
                 target_schedule = None
+            except socket.timeout as e:
+                print(e)
+                return self.get_event(calendar, eventid)
             return target_schedule
 
         def get_events_in_day(self, calendar: str, search_range: tuple) -> list:
@@ -159,17 +174,21 @@ class ConnectGoogle:
 
             if self.service is None:
                 return None
-            events = (
-                self.service.events()
-                .list(
-                    calendarId=calendar,
-                    timeMin=search_range[0],
-                    timeMax=search_range[1],
-                    singleEvents=True,
-                    orderBy="startTime",
-                )
-                .execute()
-            ).get("items", [])
+            try:
+                events = (
+                    self.service.events()
+                    .list(
+                        calendarId=calendar,
+                        timeMin=search_range[0],
+                        timeMax=search_range[1],
+                        singleEvents=True,
+                        orderBy="startTime",
+                    )
+                    .execute()
+                ).get("items", [])
+            except socket.timeout as e:
+                print(e)
+                return self.get_events_in_day(calendar, search_range)
 
             if not events:
                 print("No upcoming events found.")
