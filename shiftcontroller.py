@@ -233,7 +233,7 @@ class ShiftController:
 
         if not base_date:
             base_date = dt.datetime.now().astimezone(timezone(TIMEZONE))
-        elif isinstance(date, dt.datetime):
+        elif isinstance(base_date, dt.datetime):
             # now = date
             pass
 

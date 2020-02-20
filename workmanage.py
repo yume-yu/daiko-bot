@@ -43,6 +43,22 @@ class Work:
             }
         )
 
+    def count_worktime_rect(self, columnCount=False):
+        """
+        勤務時間に必要な目盛りの数と始点の位置を計算する
+        """
+        delta = self.end - self.start
+        hour = int(delta.seconds) / 3600
+        if columnCount:
+            diff9th = self.start - datetime.timedelta(hours=9)
+            startColumn = (
+                int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
+            )
+            # 勤務時間に加えて、必要な目盛りの数をtupleで返す
+            return (hour * 2, startColumn)
+        else:
+            return hour * 2
+
 
 class Worktime:
     def _str__(self):
@@ -188,25 +204,6 @@ class Shift:
             shift_dict.get(Shift.WORKDAYS[3]),
             shift_dict.get(Shift.WORKDAYS[4]),
         )
-
-    @staticmethod
-    def count_worktime(worktime, columnCount=False):
-        """
-        Worktimeクラスから勤務時間に必要な目盛りの数と始点の位置を計算する
-        """
-        delta = worktime.end - worktime.start
-        hour = int(delta.seconds) / 3600
-        if columnCount:
-            diff9th = worktime.start - datetime.timedelta(hours=9)
-            # diff9th = worktime.start - (worktime.start - datetime.timedelta(hours=9))
-            startColumn = (
-                int(diff9th.strftime("%H")) * 2 + int(diff9th.strftime("%M")) / 30
-            )
-            # 勤務時間に加えて、必要な目盛りの数をtupleで返す
-            return (hour * 2, startColumn)
-            # return {"startColumn": startColumn, "columns": hour * 2}
-        else:
-            return hour * 2
 
     @staticmethod
     def exchange_weekdayname(weekday):
@@ -434,6 +431,10 @@ class DrawShiftImg:
     HEIGHT = 1026
     # 週のときの1人あたりの幅
     FOR_WIDTH_RATIO = 1624 / 38
+    # グリッドの横マージン
+    SIDE_MARGIN_LINES = 2
+    # 上下のマージン
+    OVER_UNDER_MARGIN = 1
 
     ## 1日分シフト用パラメータ ##
     # 画像の幅
@@ -461,20 +462,28 @@ class DrawShiftImg:
         if kanjiBoldFontPath is None:
             kanjiBoldFontPath = kanjiFontPath
 
-        self.shift = shift
         self.shift_direction = None
+        self.img = None
+        self.shift = []
 
         # 与えられたシフト情報の型で週のシフトか日のシフトかを判定する
-        if isinstance(self.shift[0], list):
+        if isinstance(shift[0], list):
             print("This is Week Shift!")
             self.shift_direction = ShiftImageDirection.VERTICAL
+            self.shift += [self.grouping_by_member(works) for works in shift]
             self.initialize_for_week(kanjiFontPath, kanjiBoldFontPath, fontPath)
-        elif isinstance(self.shift[0], Work):
+        elif isinstance(shift[0], Work):
             print("This is a Day Shift!")
             self.shift_direction = ShiftImageDirection.HORIZONAL
+            self.shift = self.grouping_by_member(shift)
             self.initialize_for_day(kanjiFontPath, fontPath)
         else:
             raise ValueError("Invalid Shift format")
+
+        self.image = Image.new(
+            "RGB", (int(self.width), int(self.height)), DrawShiftImg.WHITE
+        )
+        self.drawObj = ImageDraw.Draw(self.image)
 
     def initialize_for_week(self, kanjiFontPath, kanjiBoldFontPath, fontPath):
         try:
@@ -489,8 +498,6 @@ class DrawShiftImg:
         self.needRows = divWidth + 4  # 表の余白分を含めた列数
         self.width = int(DrawShiftImg.FOR_WIDTH_RATIO * self.needRows)
         self.height = DrawShiftImg.HEIGHT
-        self.image = Image.new("RGB", (self.width, self.height), DrawShiftImg.WHITE)
-        self.drawObj = ImageDraw.Draw(self.image)
         # 罫線を引くためのプロパティ
         self.needColumns = 23  # 名前部分を除いた必要な列数
         self.heightOffset = self.height / 8  # 上部の名前の空間の高さ
@@ -516,10 +523,6 @@ class DrawShiftImg:
             + DrawShiftImg.BOTTOM_MARGIN_LINES
             + self.needRows
         )
-        self.image = Image.new(
-            "RGB", (int(self.width), int(self.height)), DrawShiftImg.WHITE
-        )
-        self.drawObj = ImageDraw.Draw(self.image)
         self.cell_size = self.FOR_HEIGHT_RATIO
 
     def gen_shiftrect_color(self):
@@ -538,18 +541,34 @@ class DrawShiftImg:
             yield (168, 146, 209)
             yield (213, 166, 189)
 
-    def count_need_row(self, selectedWeekday=None):
+    def grouping_by_member(self, day_shift):
+        """
+        日間シフトをSlackIDで判別してスタッフごとにリストにする
+        """
+        if isinstance(day_shift, list) and not isinstance(day_shift[0], Work):
+            raise TypeError("This shift is not day Shift")
+
+        grouped = []
+        slackid_list = list(set([work.slackid for work in day_shift]))
+        for slackid in slackid_list:
+            grouped.append([w for w in day_shift if w.slackid == slackid])
+        return sorted(grouped, key=lambda x: (x[0].start, x[0].end))
+
+    def count_need_row(self):
+        """
+        週間シフトの描画時に、必要な列数を計算する
+        """
+        if self.shift_direction is not ShiftImageDirection.VERTICAL:
+            raise TypeError("This function can be used in VERTICAL shift img")
+
         countedRows = 0
-        if selectedWeekday is None:
-            for weekday in self.shift.shift:
-                countedRows += len(weekday)
-            return countedRows
-        else:
-            return len(selectedWeekday)
+        for day in self.shift:
+            countedRows += len(day)
+        return countedRows
 
     def draw_worktime_rect(
         self,
-        worktime: Worktime,
+        work: Work,
         base_pos: tuple,
         line_number: int,
         cell_width: int,
@@ -561,22 +580,22 @@ class DrawShiftImg:
         font = self.font if font == None else font
 
         rectApex = self.calc_rect_apices(
-            worktime, base_pos, line_number, cell_width, cell_height, direction
+            work, base_pos, line_number, cell_width, cell_height, direction
         )
-        if worktime.requested:
+        if work.requested:
             self.drawObj.polygon(rectApex, self.LIGHT_GRAY)
         else:
             self.drawObj.polygon(rectApex, fill=color)
-        self.draw_worktime_detail(worktime, rectApex, direction, font)
+        self.draw_worktime_detail(work, rectApex, direction, font)
 
     def draw_worktime_detail(
         self,
-        worktime: Worktime,
+        work: Work,
         rectApex: list,
         direction: ShiftImageDirection,
         font: ImageFont,
     ):
-        need_cell, start_cell = Shift.count_worktime(worktime, columnCount=True)
+        need_cell, start_cell = work.count_worktime_rect(columnCount=True)
         if start_cell != 0:
             base_pos = rectApex[0]
 
@@ -584,13 +603,12 @@ class DrawShiftImg:
                 (
                     base_pos[0]
                     if direction == ShiftImageDirection.VERTICAL
-                    else base_pos[0]
-                    - font.getsize(worktime.start.strftime("%H:%M"))[0],
-                    base_pos[1] - font.getsize(worktime.start.strftime("%H:%M"))[1]
+                    else base_pos[0] - font.getsize(work.start.strftime("%H:%M"))[0],
+                    base_pos[1] - font.getsize(work.start.strftime("%H:%M"))[1]
                     if direction == ShiftImageDirection.VERTICAL
                     else base_pos[1],
                 ),
-                worktime.start.strftime("%H:%M"),
+                work.start.strftime("%H:%M"),
                 self.LIGHT_GRAY,
                 font=font,
             )
@@ -599,21 +617,21 @@ class DrawShiftImg:
 
             self.drawObj.text(
                 (
-                    base_pos[0] - font.getsize(worktime.end.strftime("%H:%M"))[0]
+                    base_pos[0] - font.getsize(work.end.strftime("%H:%M"))[0]
                     if direction == ShiftImageDirection.VERTICAL
                     else base_pos[0] + 1,
                     base_pos[1] - 3
                     if direction == ShiftImageDirection.VERTICAL
-                    else base_pos[1] - font.getsize(worktime.end.strftime("%H:%M"))[1],
+                    else base_pos[1] - font.getsize(work.end.strftime("%H:%M"))[1],
                 ),
-                worktime.end.strftime("%H:%M"),
+                work.end.strftime("%H:%M"),
                 self.LIGHT_GRAY,
                 font=font,
             )
 
     def calc_rect_apices(
         self,
-        worktime: Worktime,
+        work: Work,
         base_pos: tuple,
         line_number: int,
         cell_width: int,
@@ -630,7 +648,7 @@ class DrawShiftImg:
         :param ShiftImageDirection  direction : シフト画像の伸びる向き
         """
         # 就業時間と目盛りの数を計算する
-        need_cell, start_cell = Shift.count_worktime(worktime, columnCount=True)
+        need_cell, start_cell = work.count_worktime_rect(columnCount=True)
 
         if direction == ShiftImageDirection.VERTICAL:
             return [
@@ -734,43 +752,36 @@ class DrawShiftImg:
         )
 
     def print_weekseparateline(
-        self,
-        font=None,
-        boldFont=None,
-        lineWeight=boldLineWeight,
-        color=BLACK,
-        weekday=None,
+        self, font=None, boldFont=None, lineWeight=boldLineWeight, color=BLACK
     ):
         if font is None:
             font = self.kanjiFont
         if boldFont is None:
             boldFont = self.kanjBoldFont
 
-        tmpCountRow = 2  # 両サイド2列分開いてるからoffset
-        weekdayList = ("月", "火", "水", "木", "金")
-        if weekday is None:
-            weekday = "mon"
-        weekday = Shift.exchange_weekdayname(weekday)
+        tmpCountRow = self.SIDE_MARGIN_LINES  # 両サイド2列分開いてるからoffset
+        weekdayList = Shift.WORKDAYS_JP
+
         self.drawObj.line(
-            [(self.rowWidth * 2, 0), (self.rowWidth * 2, self.height)],
-            (0, 0, 0),
+            [
+                (self.rowWidth * self.SIDE_MARGIN_LINES, 0),
+                (self.rowWidth * self.SIDE_MARGIN_LINES, self.height),
+            ],
+            self.BLACK,
             lineWeight,
         )
-        for (day, loopCount) in zip(self.shift.shift, range(len(self.shift.shift))):
+
+        for (day, day_workers) in enumerate([len(workers) for workers in self.shift]):
             weekdayLabelPoint = (
-                self.rowWidth * (tmpCountRow + self.count_need_row(day) / 2)
-                - font.getsize(weekdayList[loopCount])[0] / 2,
-                (self.columnHeight - font.getsize(weekdayList[loopCount])[1]) / 2,
+                self.rowWidth * (tmpCountRow + day_workers / 2)
+                - font.getsize(weekdayList[day])[0] / 2,
+                (self.columnHeight - font.getsize(weekdayList[day])[1]) / 2,
             )
-            if weekday == day:
-                self.drawObj.text(
-                    weekdayLabelPoint, weekdayList[loopCount], color, boldFont
-                )
-            else:
-                self.drawObj.text(
-                    weekdayLabelPoint, weekdayList[loopCount], color, font
-                )
-            tmpCountRow += self.count_need_row(day)
+            self.drawObj.text(weekdayLabelPoint, weekdayList[day], color, font)
+
+            tmpCountRow += day_workers
+
+            # 曜日の区切り線を入れる
             self.drawObj.line(
                 [
                     (self.rowWidth * (tmpCountRow), 0),
@@ -779,23 +790,16 @@ class DrawShiftImg:
                 color,
                 lineWeight,
             )
+
             self.drawObj.text(
                 (
                     self.rowWidth * (tmpCountRow)
-                    - font.getsize(
-                        self.shift.shift[loopCount][0]
-                        .worktime[0]
-                        .start.strftime("%m/%d")
-                    )[0]
+                    - font.getsize(self.shift[day][0][0].start.strftime("%m/%d"))[0]
                     - (font.getsize(" ")[0]) / 2,
-                    self.columnHeight * (self.needColumns + 3)
-                    - font.getsize(
-                        self.shift.shift[loopCount][0]
-                        .worktime[0]
-                        .start.strftime("%m/%d")
-                    )[1],
+                    self.columnHeight * (self.NEED_COLUMNS + 2 * self.OVER_UNDER_MARGIN)
+                    + self.heightOffset,
                 ),
-                self.shift.shift[loopCount][0].worktime[0].start.strftime("%m/%d"),
+                self.shift[day][0][0].start.strftime("%m/%d"),
                 color,
                 font,
             )
@@ -809,12 +813,14 @@ class DrawShiftImg:
                 boldFont = self.kanjBoldFont
             nameBottomOfiiset = 20
             for (row, name) in enumerate(
-                [worker.name for day in self.shift.shift for worker in day]
+                [staff[0].staff_name for day in self.shift for staff in day]
             ):
                 self.write_text_ttb(
                     {
                         "x": self.rowWidth * (row + 2.5),
-                        "y": self.columnHeight + self.heightOffset + nameBottomOfiiset,
+                        "y": self.columnHeight * self.OVER_UNDER_MARGIN
+                        + self.heightOffset
+                        + nameBottomOfiiset,
                     },
                     name,
                 )
@@ -822,13 +828,14 @@ class DrawShiftImg:
             for count in range(len(self.shift)):
                 self.drawObj.text(
                     (
-                        self.width * 0.12 - font.getsize(self.shift[count].name)[0],
+                        self.width * 0.12
+                        - font.getsize(self.shift[count][0].staff_name)[0],
                         DrawShiftImg.FOR_HEIGHT_RATIO
                         * (DrawShiftImg.TOP_MARGIN_LINES + count)
                         + DrawShiftImg.FOR_HEIGHT_RATIO * 0.5
-                        - font.getsize(self.shift[count].name)[1] / 2,
+                        - font.getsize(self.shift[count][0].staff_name)[1] / 2,
                     ),
-                    self.shift[count].name,
+                    self.shift[count][0].staff_name,
                     DrawShiftImg.BLACK,
                     font=font,
                 )
@@ -846,9 +853,9 @@ class DrawShiftImg:
         color_iter = self.gen_shiftrect_color()
         for worker in shift:
             color = color_iter.__next__()
-            for worktime in worker.worktime:
+            for work in worker:
                 self.draw_worktime_rect(
-                    worktime,
+                    work,
                     (self.rowWidth * 2, self.heightOffset + 2 * self.columnHeight)
                     if self.shift_direction == ShiftImageDirection.VERTICAL
                     else (
@@ -979,7 +986,7 @@ class DrawShiftImg:
         if self.shift_direction != ShiftImageDirection.HORIZONAL:
             raise TypeError("This method only use in HORIZONAL")
 
-        str_date = self.shift[0].worktime[0].start.strftime("%m/%d")
+        str_date = self.shift[0][0].start.strftime("%m/%d")
         font = self.mediumFont
         self.drawObj.text(
             (
@@ -1012,7 +1019,7 @@ class DrawShiftImg:
         self.print_time()
         if self.shift_direction == ShiftImageDirection.VERTICAL:
             counter = 0
-            for shift_a_day in self.shift.shift:
+            for shift_a_day in self.shift:
                 counter = self.print_worktimerect(
                     shift_a_day,
                     timepos=timepos,
