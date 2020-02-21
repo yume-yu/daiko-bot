@@ -1,13 +1,14 @@
 import datetime as dt
 import json
 import re
+import sys
 from enum import Enum, auto
 from pprint import pprint
 
 import requests
 from pytz import timezone
 from settings import TIMEZONE, sc
-from workmanage import Shift, Worktime
+from workmanage import Shift, Work
 
 D_HELPMSG = "\n".join(
     [
@@ -108,7 +109,14 @@ def make_msg(text: str):
     return message
 
 
-def can_parse_time(time_string: str) -> str:
+def cui_error(text):
+    print(
+        "[{}]-cuiinterface {}".format(dt.datetime.now().isoformat(), text),
+        file=sys.stderr,
+    )
+
+
+def can_parse_time(time_string: str) -> dt.time:
     """
     与えられたstringがHH:MM形式かつもっともらしい時間表記であればdatetime.timeにして返す
 
@@ -153,10 +161,14 @@ def can_split_times_string(string: str) -> list:
     return time_list
 
 
-def check_times(target, times: str):
+def check_times(target_work: Work, times: str):
     try:
         # 引数の文字列が妥当かを判断
-        target_time = can_split_times_string(times)
+        target_time = [
+            dt.datetime.combine(target_work.start.date(), time)
+            for time in can_split_times_string(times)
+        ]
+        print(target_time)
     except ValueError:
         # 与えられた文字列がHH:MM~HH:MMではない
         raise InvalidTimeFormatError()
@@ -164,11 +176,9 @@ def check_times(target, times: str):
     try:
         # 代行依頼の分割位置チェックを使って指定された時刻の範囲が妥当かを判断
         devide = sc.check_need_divide(
-            original=target.worktime[0],
-            request=sc.generate_datefix_worktime(
-                target.worktime[0],
-                "{}:{}".format(target_time[0].hour, target_time[0].minute),
-                "{}:{}".format(target_time[1].hour, target_time[1].minute),
+            original=target_work,
+            request=sc.generate_datefix_work(
+                target_work, target_time[0], target_time[1]
             ),
         )
     except ValueError:
@@ -317,13 +327,10 @@ def cui_ls(args: list, slackId: str):
     except IndexError:
         date = today
 
-    # 日付とリストタイプをもとにリストを作る
-    sc.init_shift(today.strftime("%Y-%m-%d"))
-
     if list_type is ListType.ALL:
-        shift_list = sc.shift
+        shift_list = sc.get_shift(date=date)
     elif list_type is ListType.REQUESTED:
-        shift_list = sc.get_requested_shift(date.strftime("%Y-%m-%d"))
+        shift_list = sc.get_shift(date=date, only_requested=True)
         pprint(shift_list)
         shift_list = "".join(
             [
@@ -334,7 +341,7 @@ def cui_ls(args: list, slackId: str):
             ]
         )
     elif list_type is ListType.MINE:
-        shift_list = sc.get_parsonal_shift(slackId, date.strftime("%Y-%m-%d"))
+        shift_list = sc.get_shift(date=date, slackid=slackId)
         shift_list = "".join(
             [
                 "> ",
@@ -364,17 +371,16 @@ def cui_req(args: list, slackId: str):
     # 1つ目の引数を精査する
     try:
         date = can_parse_date(args[index], today)
-        target = sc.get_shift_by_date(date, slackId)
+        target = sc.get_shift(date=date, slackid=slackId, only_active=True)
+        if len(target) == 0:
+            return make_msg("> Error : この日にはシフトがありません\n" + REQ_HELPMSG)
     except ValueError:
         try:
-            target = sc.get_shift_by_id(args[index])
+            target = sc.get_shift(eventid=args[index])
         except ValueError:
             return make_msg("> Error : targetが無効です。\n" + REQ_HELPMSG)
     except IndexError:
         return make_msg(REQ_HELPMSG)
-
-    if target.worktime[0].requested:
-        return make_msg("> Error : すでに代行依頼が出されたシフトです\n" + REQ_HELPMSG)
 
     # 2番めの引数をチェック
     index += 1
@@ -431,7 +437,7 @@ def cui_req(args: list, slackId: str):
     )
 
 
-def cui_con(args: list, slackId: str):
+def cui_con(args: list, slackid: str):
     """
     /d con コマンドの中身
 
@@ -447,17 +453,16 @@ def cui_con(args: list, slackId: str):
     # 1つ目の引数を精査する
     try:
         date = can_parse_date(args[index], today)
-        target = sc.get_shift_by_date(date, slackId)
+        target = sc.get_shift(date=date, only_requested=True)
+        if len(target) == 0:
+            return make_msg("> Error : 対象になるシフトがありません\n" + CON_HELPMSG)
     except ValueError:
         try:
-            target = sc.get_shift_by_id(args[index])
+            target = sc.get_shift(eventid=args[index])
         except (ValueError, KeyError):
             return make_msg("> Error : targetが無効です。\n" + CON_HELPMSG)
     except IndexError:
         return make_msg(CON_HELPMSG)
-
-    if target.worktime[0].requested is False:
-        return make_msg("> Error : 代行依頼がされていないシフトです\n" + CON_HELPMSG)
 
     # 2番めの引数をチェック
     index += 1
@@ -491,35 +496,25 @@ def cui_con(args: list, slackId: str):
         pass
 
         # 代行の開始時間と終了時間を整理
-    start = (
-        target.worktime[0].start.strftime("%H:%M")
-        if target_time is None
-        else target_time[0].strftime("%H:%M")
-    )
-    end = (
-        target.worktime[0].end.strftime("%H:%M")
-        if target_time is None
-        else target_time[1].strftime("%H:%M")
-    )
+    start = target.start if target_time is None else target_time[0]
+    end = target.end if target_time is None else target_time[1]
 
-    sc.contract(
-        slackId=slackId, eventId=target.worktime[0].eventid, start=start, end=end
-    )
+    sc.contract(slackid=slackid, eventid=target.eventid, start=start, end=end)
     sc.post_message(
         sc.make_notice_message(
-            slackId, sc.Actions.CONTRACT, target, start, end, comment
+            slackid, sc.Actions.CONTRACT, target, start, end, comment
         )
     )
-    sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.CONTRACT)
+    sc.record_use(slackid, sc.UseWay.COMM, sc.Actions.CONTRACT)
 
     return make_msg(
         "> 代行を請け負いました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
-            target.worktime[0].start.strftime("%Y-%m-%d"), start, end, comment
+            target.start.strftime("%Y-%m-%d"), start, end, comment
         )
     )
 
 
-def cui_img(args: list, slackId: str):
+def cui_img(args: list, slackid: str):
     """
     /d img コマンドの中身
 
@@ -528,6 +523,7 @@ def cui_img(args: list, slackId: str):
     """
 
     index = 1
+    shift = None
     date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
 
     # 引数の1つ目(eventid or date)を検証
@@ -542,24 +538,16 @@ def cui_img(args: list, slackId: str):
     # 日付をもとに画像を作る
     try:
         if args[index] in ("-w", "-W"):
-            sc.init_shift(date.strftime("%Y-%m-%d"))
-            uploaded_file = sc.generate_shiftimg_url()
+            shift = sc.get_week_shift(base_date=date, grouping_by_week=True)
         else:
-            uploaded_file = sc.generate_shiftimg_url(shift=sc.get_shift_in_a_day(date))
+            shift = sc.get_shift(date=date)
     except IndexError:
-        uploaded_file = sc.generate_shiftimg_url(shift=sc.get_shift_in_a_day(date))
+        shift = sc.get_shift(date=date)
 
-    while True:
-        try:
-            uploaded_file = sc.generate_shiftimg_url(
-                retry=True, filename=uploaded_file["filename"]
-            )
-        except FileNotFoundError as e:
-            print("ok,upload success.")
-            print(e)
-            break
+    uploaded_file = sc.generate_shiftimg_url(shift=shift)
+    print("ok,upload success.")
 
-    sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.SHOWSHIFT)
+    sc.record_use(slackid, sc.UseWay.COMM, sc.Actions.SHOWSHIFT)
 
     show_shift = {
         "response_type": "ephemeral",
