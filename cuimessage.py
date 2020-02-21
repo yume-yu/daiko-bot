@@ -355,7 +355,7 @@ def cui_ls(args: list, slackId: str):
     return make_msg(str(list_type) + "\n" + shift_list)
 
 
-def cui_req(args: list, slackId: str):
+def cui_req(args: list, slackid: str):
     """
     /d req コマンドの中身
 
@@ -371,7 +371,7 @@ def cui_req(args: list, slackId: str):
     # 1つ目の引数を精査する
     try:
         date = can_parse_date(args[index], today)
-        target = sc.get_shift(date=date, slackid=slackId, only_active=True)
+        target = sc.get_shift(date=date, slackid=slackid, only_active=True)
         if len(target) == 0:
             return make_msg("> Error : この日にはシフトがありません\n" + REQ_HELPMSG)
     except ValueError:
@@ -399,9 +399,6 @@ def cui_req(args: list, slackId: str):
                 return make_msg("> Error : 時刻指定の文字列が不適切です\n" + CON_HELPMSG)
             except IndexError:
                 return make_msg("> Error : rangeが不正です\n" + CON_HELPMSG)
-            if devide is sc.DevPos.INCLUDE:
-                # 時刻の範囲が内包されている
-                return make_msg("> Error : 時刻の範囲が不適切です\n" + CON_HELPMSG)
 
             # 時間指定を受け取ったので次の引数を参照する
             index += 1
@@ -413,22 +410,14 @@ def cui_req(args: list, slackId: str):
         return make_msg("> Error : commentがありません\n" + REQ_HELPMSG)
 
         # 代行の開始時間と終了時間を整理
-    start = (
-        target.worktime[0].start.strftime("%H:%M")
-        if target_time is None
-        else target_time[0].strftime("%H:%M")
-    )
-    end = (
-        target.worktime[0].end.strftime("%H:%M")
-        if target_time is None
-        else target_time[1].strftime("%H:%M")
-    )
+    start = target.start if target_time is None else target_time[0]
+    end = target.end if target_time is None else target_time[1]
 
-    sc.request(eventId=target.worktime[0].eventid, start=start, end=end)
+    sc.request(eventid=target.eventid, start=start, end=end)
     sc.post_message(
-        sc.make_notice_message(slackId, sc.Actions.REQUEST, target, start, end, comment)
+        sc.make_notice_message(slackid, sc.Actions.REQUEST, target, start, end, comment)
     )
-    sc.record_use(slackId, sc.UseWay.COMM, sc.Actions.REQUEST)
+    sc.record_use(slackid, sc.UseWay.COMM, sc.Actions.REQUEST)
 
     return make_msg(
         "> 代行を依頼しました。\n> date : {} \n> time: {}~{}\n> comment: {}".format(
