@@ -182,15 +182,24 @@ class ShiftController:
         """
 
         if eventid is not None:
-            # eventidの指定があった場合はその他に依らず一意なのでそのまま返す
-            target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
-            if target is not None:
-                return self.convert_event_to_work(target)
+            print("have eventid")
+            if only_requested:
+                target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
+                print(target)
+                return target
+            elif only_active:
+                target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
+                return target
+            else:
+                target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
+                if target is not None:
+                    return self.convert_event_to_work(target)
 
-            target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
-            if target is not None:
-                return self.convert_event_to_work(target)
-            return None
+                target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
+                if target is not None:
+                    return self.convert_event_to_work(target)
+
+            raise ValueError("Ths shift had eventid is none")
 
         if date is None:
             date = dt.datetime.now()
@@ -199,11 +208,11 @@ class ShiftController:
 
         events = []
 
-        if not only_active:
+        if not only_requested:
             # 代行依頼のみの指定がなければ有効なシフトを取得し全体にappend
             events += self.calendar.get_events_in_day(CALENDARID_SHIFT, opening_range)
 
-        if not only_requested:
+        if not only_active:
             # 有効なシフトのみの指定がなければ代行依頼を取得し全体にappend
             events += self.calendar.get_events_in_day(CALENDARID_DAIKO, opening_range)
 
@@ -257,22 +266,16 @@ class ShiftController:
 
         return works_list
 
-    def generate_shiftimg_url(self, shift, retry=False, filename: str = None) -> str:
+    def generate_shiftimg_url(self, shift, filename: str = None) -> str:
         """
         現在のシフトの画像のurlを返す
 
         :return str : 画像のurl
         """
-        if not retry:
-            filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
-            DrawShiftImg(shift, FONT).make_shiftimage().save(filename, quality=95)
-        try:
-            image_url = self.drive.upload4share(
-                filename, filename, self.drive.JPEGIMAGE
-            )
-        except socket.timeout as e:
-            print(e)
-            return {"url": None, "filename": filename}
+        filename = "{}.jpg".format(dt.datetime.now().strftime("%Y%m%d%H%M%S%f"))
+        DrawShiftImg(shift, FONT).make_shiftimage().save(filename, quality=95)
+        image_url = self.drive.upload4share(filename, filename, self.drive.JPEGIMAGE)
+        print("delete file!")
         os.remove(filename)
         return {"url": image_url, "filename": filename}
 
@@ -471,7 +474,7 @@ class ShiftController:
             return_message = "<@{user}>さんが<@{origin}>さんのシフトの代行を引き受けました。\n日付 : {date}\n時間 : {start}~{end}\n> {message}".format(
                 user=slackid,
                 date=work.start.strftime("%m/%d"),
-                origin=self.sheet.get_slackId2name_dict(toName=False)[work.name],
+                origin=self.sheet.get_slackId2name_dict(toName=False)[work.staff_name],
                 start=start if type(start) is str else start.strftime("%H:%M"),
                 end=end if type(end) is str else end.strftime("%H:%M"),
                 message=message,

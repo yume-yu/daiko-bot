@@ -33,6 +33,13 @@ BEFORE_OPEN_TIME = 8
 AFTER_CLOSE_TIME = 19
 
 
+def gcon_error_out(text):
+    print(
+        "[{}]-ConnectGoogle {}".format(dt.datetime.now().isoformat(), text),
+        file=sys.stderr,
+    )
+
+
 class ConnectGoogle:
     def update_token(self):
         creds = Credentials(
@@ -153,13 +160,15 @@ class ConnectGoogle:
             return updated_event
 
         def get_event(self, calendar: str, eventid: str):
+            print("call get_event")
             try:
                 target_schedule = (
                     self.service.events()
                     .get(calendarId=calendar, eventId=eventid)
                     .execute()
                 )
-            except g_errors.HttpError:
+            except g_errors.HttpError as e:
+                print(e)
                 target_schedule = None
             except socket.timeout as e:
                 print(e)
@@ -259,7 +268,14 @@ class ConnectGoogle:
                 .batchGetByDataFilter(spreadsheetId=SPREADSHEETID, body=request_doby)
             )
 
-            response = request.execute()
+            try:
+                response = request.execute()
+            except g_errors as e:
+                gcon_error_out("catch e_errors\n{}".format(e))
+            except socket.timeout:
+                gcon_error_out("catch timeout in GoogleSpreadSheet.get(). retry")
+                return self.get(sheetName)
+
             return response.get("valueRanges")[0].get("valueRange").get("values")
 
         def append(self, data: list, sheetName: str) -> object:
@@ -269,18 +285,25 @@ class ConnectGoogle:
             :param str sheetName : name of target sheet.
             """
             body = {"values": [data]}
-            response = (
-                self.service.spreadsheets()
-                .values()
-                .append(
-                    spreadsheetId=SPREADSHEETID,
-                    range=sheetName,
-                    valueInputOption="RAW",
-                    insertDataOption="INSERT_ROWS",
-                    body=body,
+            try:
+                response = (
+                    self.service.spreadsheets()
+                    .values()
+                    .append(
+                        spreadsheetId=SPREADSHEETID,
+                        range=sheetName,
+                        valueInputOption="RAW",
+                        insertDataOption="INSERT_ROWS",
+                        body=body,
+                    )
+                    .execute()
                 )
-                .execute()
-            )
+            except g_errors as e:
+                gcon_error_out("catch e_errors\n{}".format(e))
+            except socket.timeout:
+                gcon_error_out("catch timeout in GoogleSpreadSheet.append(). retry...")
+                return self.append(sheetName)
+
             return response
 
         def update(self, data: list, sheetName: str, date_range: str) -> object:
@@ -290,17 +313,23 @@ class ConnectGoogle:
             :param str sheetName : name of target sheet.
             """
             body = {"values": [data]}
-            response = (
-                self.service.spreadsheets()
-                .values()
-                .update(
-                    spreadsheetId=SPREADSHEETID,
-                    valueInputOption="USER_ENTERED",
-                    range="{}!{}".format(sheetName, date_range),
-                    body=body,
+            try:
+                response = (
+                    self.service.spreadsheets()
+                    .values()
+                    .update(
+                        spreadsheetId=SPREADSHEETID,
+                        valueInputOption="USER_ENTERED",
+                        range="{}!{}".format(sheetName, date_range),
+                        body=body,
+                    )
+                    .execute()
                 )
-                .execute()
-            )
+            except g_errors as e:
+                gcon_error_out("catch e_errors\n{}".format(e))
+            except socket.timeout:
+                gcon_error_out("catch timeout in GoogleSpreadSheet.update(). retry...")
+                return self.append(sheetName)
             return response
 
         def get_slackId2name_dict(self, toName=True) -> dict:
@@ -342,11 +371,19 @@ class ConnectGoogle:
                 "parents": ["1WM6yJVBgoqU9azui7d_EhGuFp5KDIjAN"],
             }
             media_body = MediaFileUpload(filepath, mimetype=filetype)
-            file = (
-                self.service.files()
-                .create(body=file_metadata, media_body=media_body, fields="id")
-                .execute()
-            )
+            try:
+                file = (
+                    self.service.files()
+                    .create(body=file_metadata, media_body=media_body, fields="id")
+                    .execute()
+                )
+            except g_errors as e:
+                gcon_error_out("catch e_errors\n{}".format(e))
+            except socket.timeout:
+                gcon_error_out("catch timeout in GoogleDrive().upload. retry...")
+                return self.upload(
+                    filename=filename, filepath=filepath, filetype=filetype
+                )
             return file.get("id")
 
         def share(self, fileid: str) -> dict:
