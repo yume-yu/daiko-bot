@@ -217,35 +217,34 @@ def can_parse_date(string: str, today: dt):
 
 def parse_shift2strlist(shift_list: list, need_name: bool):
     """
-    worker型をmarkdown形式のstrにして返す
+    Workのリストをmarkdown形式のstrにして返す
 
     :param list shift_list : worker型のリスト
     :param bool need_name : 返す文字列にシフトの持ち主の名前を入れるかどうか
     """
     return_str = ""
-    for shift in shift_list:
-        name = shift.name if need_name else ""
+    for work in shift_list:
+        name = work.staff_name if need_name else ""
         requested = "[依頼済]"
-        for worktime in shift.worktime:
-            date = worktime.start.strftime("%m-%d")
-            weekday = Shift.WORKDAYS_JP[worktime.start.weekday()]
-            date = "".join([date, "(", weekday, ")"])
-            start = worktime.start.strftime("%H:%M")
-            end = worktime.end.strftime("%H:%M")
-            eventid = worktime.eventid
-            return_str += " ".join(
-                [
-                    "> *",
-                    name,
-                    date,
-                    start,
-                    "~",
-                    end,
-                    eventid,
-                    requested if worktime.requested else "",
-                    "\n",
-                ]
-            )
+        date = work.start.strftime("%m-%d")
+        weekday = Shift.WORKDAYS_JP[work.start.weekday()]
+        date = "".join([date, "(", weekday, ")"])
+        start = work.start.strftime("%H:%M")
+        end = work.end.strftime("%H:%M")
+        eventid = work.eventid
+        return_str += " ".join(
+            [
+                "> *",
+                name,
+                date,
+                start,
+                "~",
+                end,
+                eventid,
+                requested if work.requested else "",
+                "\n",
+            ]
+        )
     return return_str
 
 
@@ -287,12 +286,12 @@ def check_args(args: list, slackId: str):
         return make_msg(D_HELPMSG)
 
 
-def cui_ls(args: list, slackId: str):
+def cui_ls(args: list, slackid: str):
     """
     /d ls コマンドの中身
 
     :param list args : 呼び出し時の引数リスト
-    :param str slackId : 呼び出した人のslackId
+    :param str slackid : 呼び出した人のslackId
     """
 
     class ListType(Enum):
@@ -309,8 +308,7 @@ def cui_ls(args: list, slackId: str):
         # ここから第1引数 - リストの種類判定
         if "all".startswith(args[index]):
             index += 1
-            # list_type = ListType.ALL
-            raise IndexError
+            list_type = ListType.ALL
         elif "requested".startswith(args[index]):
             index += 1
             list_type = ListType.REQUESTED
@@ -328,10 +326,17 @@ def cui_ls(args: list, slackId: str):
         date = today
 
     if list_type is ListType.ALL:
-        shift_list = sc.get_shift(date=date)
+        shift_list = sc.get_week_shift(base_date=date)
+        shift_list = "".join(
+            [
+                "> ",
+                date.strftime("%Y-%m-%d"),
+                "の週のすべてのシフト\n",
+                parse_shift2strlist(shift_list, True),
+            ]
+        )
     elif list_type is ListType.REQUESTED:
-        shift_list = sc.get_shift(date=date, only_requested=True)
-        pprint(shift_list)
+        shift_list = sc.get_week_shift(base_date=date, only_requested=True)
         shift_list = "".join(
             [
                 "> ",
@@ -341,7 +346,9 @@ def cui_ls(args: list, slackId: str):
             ]
         )
     elif list_type is ListType.MINE:
-        shift_list = sc.get_shift(date=date, slackid=slackId)
+        shift_list = sc.get_week_shift(
+            base_date=date, slackid=slackid, only_active=True
+        )
         shift_list = "".join(
             [
                 "> ",
@@ -352,6 +359,7 @@ def cui_ls(args: list, slackId: str):
             ]
         )
 
+    pprint(shift_list)
     return make_msg(str(list_type) + "\n" + shift_list)
 
 
