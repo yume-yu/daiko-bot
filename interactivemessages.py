@@ -51,10 +51,9 @@ def get_block(
     elif action_value == "cancel":
         return canceled
     elif action_value == "select_shift":
-        if literal_eval(value.title()):
-            return make_reqest_dialog(eventid)
-        else:
-            return make_contract_dialog(eventid)
+        return make_application_dialog(
+            eventid=eventid, is_request=literal_eval(value.title())
+        )
     elif action_value == "request_dialog_ok":
         return make_comfirm_request(target, value)
     elif action_value == "contract_dialog_ok":
@@ -85,92 +84,77 @@ def make_shift_list(slack_id, request: bool, date: str = None) -> dict:
     :return     dict
     """
 
+    # slackのdate selectorの回答は"%Y-%m-%d"の文字列なので、dt.datetimeにconvert
+    date = (
+        dt.datetime.strptime(date, "%Y-%m-%d")
+        if date is not None
+        else dt.datetime.now()
+    )
     # テンプレートをコピーして文言準備
     # 依頼か請負かでの文言変更
     made_block = copy.deepcopy(select_nearly)
-    # 代行依頼のとき
-    if request:
-        made_block["blocks"][0] = {
-            "type": "section",
-            "block_id": "select_shift",
-            "text": {"type": "mrkdwn", "text": "代行依頼を出すシフトを選んでください"},
-            "accessory": {
-                "type": "static_select",
-                "action_id": str(request),
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "この週のあなたのシフト",
-                    "emoji": True,
-                },
-                "options": [],
-            },
+    made_block["blocks"][0] = {
+        "type": "section",
+        "block_id": "select_shift",
+        "text": {
+            "type": "mrkdwn",
+            "text": ("代行依頼を出すシフトを選んでください" if request else "代行依頼を受けるシフトを選んでください"),
         }
-    # 代行請負のとき
-    else:
-        made_block["blocks"][0] = {
-            "type": "section",
-            "block_id": "select_shift",
-            "text": {"type": "mrkdwn", "text": "代行依頼を受けるシフトを選んでください"},
-            "accessory": {
-                "type": "static_select",
-                "action_id": str(request),
-                "placeholder": {
-                    "type": "plain_text",
-                    "text": "この週の代行依頼",
-                    "emoji": True,
-                },
-                "options": [],
+        if request
+        else {"type": "mrkdwn", "text": "代行依頼を受けるシフトを選んでください"},
+        "accessory": {
+            "type": "static_select",
+            "action_id": str(request),
+            "placeholder": {
+                "type": "plain_text",
+                "text": "この日のあなたのシフト" if request else "この日の代行依頼",
+                "emoji": True,
             },
-        }
+            "options": [],
+        },
+    }
 
     # いずれかの状態のシフト一覧を取得
     shift_list = []
     if request:
-        shift_list = sc.get_parsonal_shift(slack_id, date)
+        shift_list = sc.get_shift(date=date, slackid=slack_id, only_active=True)
     else:
-        shift_list = sc.get_requested_shift(date)
+        shift_list = sc.get_shift(date=date, only_requested=True)
 
     # シフト一覧部分のオブジェクトをつくる
-    for works in shift_list:
-        name = ""
+    for work in shift_list:
         # 依頼済みリストのときは名前を表示するため名前を取得
-        if not request:
-            name = "{} ".format(works.name)
-        for worktime in works.worktime:
-            if worktime.requested == (not request):
-                date = worktime.start.strftime("%m/%d")
-                weekday = Shift.WORKDAYS_JP[worktime.start.weekday()]
-                starttime = worktime.start.strftime("%H:%M")
-                endtime = worktime.end.strftime("%H:%M")
-                shift_block = {
-                    "text": {
-                        "type": "plain_text",
-                        "text": "{date}({weekday}) {name}{start}~{end}".format(
-                            name=name,
-                            date=date,
-                            weekday=weekday,
-                            start=starttime,
-                            end=endtime,
-                        ),
-                        "emoji": True,
-                    },
-                    "value": worktime.eventid,
-                }
-                print(made_block["blocks"][0]["accessory"])
-                made_block["blocks"][0]["accessory"]["options"].append(shift_block)
+        name = work.staff_name
+        date = work.start.strftime("%m/%d")
+        weekday = Shift.WORKDAYS_JP[work.start.weekday()]
+        starttime = work.start.strftime("%H:%M")
+        endtime = work.end.strftime("%H:%M")
+        shift_block = {
+            "text": {
+                "type": "plain_text",
+                "text": "{date}({weekday}) {name}{start}~{end}".format(
+                    name="" if request else name,
+                    date=date,
+                    weekday=weekday,
+                    start=starttime,
+                    end=endtime,
+                ),
+                "emoji": True,
+            },
+            "value": work.eventid,
+        }
+        print(made_block["blocks"][0]["accessory"])
+        made_block["blocks"][0]["accessory"]["options"].append(shift_block)
 
     # リストにするシフトがなかったときはない旨を書く
     if not made_block["blocks"][0]["accessory"]["options"]:
-        if request:
-            made_block["blocks"][0] = {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": "この週にはあなたのシフトはないようです"},
-            }
-        else:
-            made_block["blocks"][0] = {
-                "type": "section",
-                "text": {"type": "mrkdwn", "text": "この週には代行依頼はないようです"},
-            }
+        made_block["blocks"][0] = {
+            "type": "section",
+            "text": {
+                "type": "mrkdwn",
+                "text": ("この日にはあなたのシフトはないようです" if request else "この日には代行依頼はないようです"),
+            },
+        }
 
     # このリストが依頼か代行かをflagでaction_idに記録
     made_block["blocks"][1]["accessory"]["action_id"] = str(request)
@@ -178,17 +162,17 @@ def make_shift_list(slack_id, request: bool, date: str = None) -> dict:
     return made_block
 
 
-def make_reqest_dialog(eventid):
+def make_application_dialog(eventid: str, is_request: bool):
     """
-    代行を依頼するためのフォームをつくる
+    代行を依頼/請負申請のフォームをつくる
 
     :param str eventid : 代行依頼を出すシフトのeventid
     """
-    return_block = copy.deepcopy(request_dialog)
-    target = sc.get_shift_by_id(eventid)
-    date = target.worktime[0].start.strftime("%m/%d")
-    start = target.worktime[0].start.strftime("%H:%M")
-    end = target.worktime[0].end.strftime("%H:%M")
+    return_block = copy.deepcopy(request_dialog if is_request else contract_dialog)
+    target = sc.get_shift(eventid=eventid)
+    date = target.start.strftime("%m/%d")
+    start = target.start.strftime("%H:%M")
+    end = target.end.strftime("%H:%M")
     return_block["dialog"]["state"] = (
         "eventid," + eventid + ",start," + start + ",end," + end + ",date," + date
     )
@@ -196,28 +180,6 @@ def make_reqest_dialog(eventid):
     return_block["dialog"]["elements"][1]["value"] = end
     return_block["dialog"]["elements"][0]["label"] = "開始時間 - {}~".format(start)
     return_block["dialog"]["elements"][1]["label"] = "終了時間 - ~{}".format(end)
-    return return_block
-
-
-def make_contract_dialog(eventid):
-    """
-    代行を請け負うためのフォームをつくる
-
-    :param str eventid : 代行依頼を出すシフトのeventid
-    """
-    return_block = copy.deepcopy(contract_dialog)
-    target = sc.get_shift_by_id(eventid)
-    date = target.worktime[0].start.strftime("%m/%d")
-    start = target.worktime[0].start.strftime("%H:%M")
-    end = target.worktime[0].end.strftime("%H:%M")
-    return_block["dialog"]["state"] = (
-        "eventid," + eventid + ",start," + start + ",end," + end + ",date," + date
-    )
-    return_block["dialog"]["elements"][0]["value"] = start
-    return_block["dialog"]["elements"][1]["value"] = end
-    return_block["dialog"]["elements"][0]["label"] = "開始時間 - {}~".format(start)
-    return_block["dialog"]["elements"][1]["label"] = "終了時間 - ~{}".format(end)
-    print(return_block)
     return return_block
 
 
@@ -255,34 +217,50 @@ def make_comfirm_request(target: dict, value: str):
     return return_block
 
 
-def request_shift(target: dict, slackId: str) -> dict:
+def request_shift(target: dict, slackid: str) -> dict:
     if not target:
         return error_message
     pprint(target)
-    sc.request(target["eventid"], target["start"], target["end"])
+    target_work = sc.get_shift(eventid=target["eventid"])
+    start_dt = target_work.start.replace(
+        hour=int(target["start"].split(":")[0]),
+        minute=int(target["start"].split(":")[1]),
+    )
+    end_dt = target_work.end.replace(
+        hour=int(target["end"].split(":")[0]), minute=int(target["end"].split(":")[1])
+    )
+    sc.request(target["eventid"], start_dt, end_dt)
+    del start_dt, end_dt
     sc.post_message(
         sc.make_notice_message(
-            slackId,
+            slackid,
             sc.Actions.REQUEST,
-            sc.get_shift_by_id(target["eventid"]),
+            sc.get_shift(eventid=target["eventid"]),
             target["start"],
             target["end"],
             target["comment"],
         )
     )
-    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.REQUEST)
+    sc.record_use(slackid, sc.UseWay.BUTTONS, sc.Actions.REQUEST)
     return complate_request
 
 
-def contract_shift(target: dict, slackId: str) -> dict:
+def contract_shift(target: dict, slackid: str) -> dict:
     if not target:
         return error_message
 
-    original_work = sc.get_shift_by_id(target["eventid"])
-    sc.contract(target["eventid"], slackId, target["start"], target["end"])
+    original_work = sc.get_shift(eventid=target["eventid"])
+    start_dt = original_work.start.replace(
+        hour=int(target["start"].split(":")[0]),
+        minute=int(target["start"].split(":")[1]),
+    )
+    end_dt = original_work.end.replace(
+        hour=int(target["end"].split(":")[0]), minute=int(target["end"].split(":")[1])
+    )
+    sc.contract(target["eventid"], slackid, start_dt, end_dt)
     sc.post_message(
         sc.make_notice_message(
-            slackId,
+            slackid,
             sc.Actions.CONTRACT,
             original_work,
             target["start"],
@@ -290,7 +268,7 @@ def contract_shift(target: dict, slackId: str) -> dict:
             target["comment"],
         )
     )
-    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.CONTRACT)
+    sc.record_use(slackid, sc.UseWay.BUTTONS, sc.Actions.CONTRACT)
     return complate_request
 
 
@@ -301,7 +279,6 @@ def get_shift_image(slackId):
     :param str slackId : 呼び出したユーザーのslackId
     """
     return_block = copy.deepcopy(show_shift)
-    sc.init_shift()
     uploaded_file = sc.generate_shiftimg_url()
     while True:
         try:
@@ -519,7 +496,7 @@ select_nearly = {
                 "action_id": "",
                 "placeholder": {
                     "type": "plain_text",
-                    "text": "この週のあなたのシフト",
+                    "text": "この日のあなたのシフト",
                     "emoji": True,
                 },
                 "options": [],
@@ -528,7 +505,7 @@ select_nearly = {
         {
             "block_id": "select_date",
             "type": "section",
-            "text": {"type": "mrkdwn", "text": "他の週のシフトを探しますか?\nシフトのある週の日付を1つえらんでください"},
+            "text": {"type": "mrkdwn", "text": "他の日のシフトを探しますか?\n日付をえらんでください"},
             "accessory": {
                 "type": "datepicker",
                 "action_id": "",
