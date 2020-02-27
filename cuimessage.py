@@ -359,7 +359,6 @@ def cui_ls(args: list, slackid: str):
             ]
         )
 
-    pprint(shift_list)
     return make_msg(str(list_type) + "\n" + shift_list)
 
 
@@ -526,20 +525,26 @@ def cui_img(args: list, slackid: str):
     # 引数の1つ目(eventid or date)を検証
     try:
         date = can_parse_date(args[index], today)
-        index += 1
     except ValueError:
-        return make_msg(IMG_HELPMSG)
+        if args[index] in ("-w", "-W"):
+            pass
+        else:
+            return make_msg(IMG_HELPMSG)
     except IndexError:
         pass
+    else:
+        index += 1
 
     # 日付をもとに画像を作る
     try:
         if args[index] in ("-w", "-W"):
-            shift = sc.get_week_shift(base_date=date, grouping_by_week=True)
+            shift = sc.get_week_shift(
+                base_date=date, grouping_by_week=True, fill_blank=True
+            )
         else:
-            shift = sc.get_shift(date=date)
+            shift = sc.get_shift(date=date, fill_blank=True)
     except IndexError:
-        shift = sc.get_shift(date=date)
+        shift = sc.get_shift(date=date, fill_blank=True)
 
     uploaded_file = sc.generate_shiftimg_url(shift=shift)
     print("ok,upload success.")

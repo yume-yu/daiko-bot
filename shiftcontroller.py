@@ -170,6 +170,7 @@ class ShiftController:
         slackid=None,
         only_requested: bool = False,
         only_active: bool = False,
+        fill_blank: bool = False,
     ):
         """
         指定された条件のWorkのリストを返す
@@ -218,6 +219,31 @@ class ShiftController:
 
         works = self.convert_event_to_work(events)
         del events
+
+        # シフトが空でfill_blankフラグが立っていれば空白を埋めるブランクのシフトを挿入する
+        if len(works) == 0 and fill_blank:
+            open_hour, close_hour = self.calc_opening_hours(date)
+            works.append(
+                Work(
+                    staff_name="該当なし",
+                    start=open_hour,
+                    end=close_hour,
+                    requested=True,
+                    eventid="thisisblank",
+                    slackid="thisisblack",
+                )
+            )
+            works.append(
+                Work(
+                    staff_name=" ",
+                    start=open_hour,
+                    end=close_hour,
+                    requested=True,
+                    eventid="thisisblank",
+                    slackid="thisisempty",
+                )
+            )
+
         if slackid is not None:
             return [work for work in works if work.slackid == slackid]
         else:
@@ -230,6 +256,7 @@ class ShiftController:
         only_requested: bool = False,
         only_active: bool = False,
         grouping_by_week: bool = False,
+        fill_blank: bool = False,
     ):
         """
         指定された日を基準として条件にあったその週全体のWorkのリストを返す
@@ -257,6 +284,7 @@ class ShiftController:
                 slackid=slackid,
                 only_active=only_active,
                 only_requested=only_requested,
+                fill_blank=fill_blank,
             )
 
             if grouping_by_week:
