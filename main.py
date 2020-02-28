@@ -2,22 +2,40 @@ import datetime as dt
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from ast import literal_eval
+from logging import StreamHandler
+from pprint import pformat, pprint
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, request, url_for
-
 from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
+from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask_httpauth import HTTPDigestAuth
 from interactivemessages import csv_to_dict, get_block
 from settings import *
 
 app = Flask(__name__)
+app.config["SECRET_KEY"] = "qwertyuiop"
+app.debug = True
+# file_handler = StreamHandler()
+app.logger.addHandler(StreamHandler())
+auth = HTTPDigestAuth()
+
+users = {"yume_yu": "password"}
+
+
+@auth.get_password
+def get_pw(username):
+    if username in users:
+        return users.get(username)
+    return None
 
 
 @app.route("/")
+@auth.login_required
 def show_entries():
     return render_template("index.html", imgpath="./static/img/sample.jpg")
     # return str("hello, world")
@@ -126,7 +144,9 @@ def validate_contract(responce_data: dict, state: dict) -> list:
 def check_post():
 
     get_json = json.loads(request.form["payload"])
-    print(json.loads(request.form["payload"]))
+    app.logger.warning(pformat(get_json))
+    # pprint(get_json, stream=app.logger)
+    # logger.debug(get_json)
 
     # tokenの確認
     if not validate_token(get_json["token"]):
@@ -250,15 +270,19 @@ def check_post():
                 slack_id=get_json["user"]["id"],
             )
             return_block = return_block
-        elif responce_action["block_id"] == "show_shift":
+        elif responce_action["block_id"] in ("show_shift", "switch_type"):
             return_block = get_block(
-                responce_action["block_id"], slack_id=get_json["user"]["id"]
+                responce_action["block_id"],
+                slack_id=get_json["user"]["id"],
+                value=responce_action,
             )
         else:
             if "value" in responce_action.keys():
                 selected_action = responce_action["value"]
                 return_block = get_block(
-                    selected_action, slack_id=get_json["user"]["id"]
+                    selected_action,
+                    slack_id=get_json["user"]["id"],
+                    value=get_json.get("actions")[0],
                 )
 
     if not return_block:

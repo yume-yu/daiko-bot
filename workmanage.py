@@ -456,6 +456,12 @@ class DrawShiftImg:
     gridLineWeight = 1
     boldLineWeight = 3
 
+    def dsi_error(self, text):
+        print(
+            "[{}]-DrawShiftImg {}".format(dt.datetime.now().isoformat(), text),
+            file=sys.stderr,
+        )
+
     def __init__(self, shift, kanjiFontPath, kanjiBoldFontPath=None, fontPath=None):
         if fontPath is None:
             fontPath = kanjiFontPath
@@ -465,18 +471,16 @@ class DrawShiftImg:
         self.shift_direction = None
         self.img = None
         self.shift = []
+        if not isinstance(shift, list):
+            raise ValueError("Invalid Shift format")
 
         # 与えられたシフト情報の型で週のシフトか日のシフトかを判定する
         if isinstance(shift[0], list):
             print("This is Week Shift!")
-            self.shift_direction = ShiftImageDirection.VERTICAL
-            self.shift += [self.grouping_by_member(works) for works in shift]
-            self.initialize_for_week(kanjiFontPath, kanjiBoldFontPath, fontPath)
+            self.initialize_for_week(shift, kanjiFontPath, kanjiBoldFontPath, fontPath)
         elif isinstance(shift[0], Work):
             print("This is a Day Shift!")
-            self.shift_direction = ShiftImageDirection.HORIZONAL
-            self.shift = self.grouping_by_member(shift)
-            self.initialize_for_day(kanjiFontPath, fontPath)
+            self.initialize_for_day(shift, kanjiFontPath, fontPath)
         else:
             raise ValueError("Invalid Shift format")
 
@@ -485,7 +489,9 @@ class DrawShiftImg:
         )
         self.drawObj = ImageDraw.Draw(self.image)
 
-    def initialize_for_week(self, kanjiFontPath, kanjiBoldFontPath, fontPath):
+    def initialize_for_week(self, shift, kanjiFontPath, kanjiBoldFontPath, fontPath):
+        self.shift_direction = ShiftImageDirection.VERTICAL
+        self.shift += [self.grouping_by_member(works) for works in shift]
         try:
             self.font = ImageFont.truetype(str(fontPath), 25)
             self.smallFont = ImageFont.truetype(str(fontPath), 15)
@@ -507,7 +513,8 @@ class DrawShiftImg:
         ) / self.needColumns  # 名前部分を以外の列の高さ
         self.rowWidth = self.width / self.needRows  # 1列の幅
 
-    def initialize_for_day(self, kanjiFontPath, fontPath):
+    def initialize_for_day(self, shift, kanjiFontPath, fontPath):
+        self.shift_direction = ShiftImageDirection.HORIZONAL
         try:
             self.font = ImageFont.truetype(str(fontPath), 100)
             self.kanjiFont = ImageFont.truetype(str(kanjiFontPath), 25)
@@ -516,6 +523,7 @@ class DrawShiftImg:
         except (IOError, OSError):
             raise ValueError("Invalid Font file path")
 
+        self.shift = self.grouping_by_member(shift)
         self.needRows = len(self.shift)  # グリッドの必要行数
         self.width = DrawShiftImg.WIDTH
         self.height = DrawShiftImg.FOR_HEIGHT_RATIO * (

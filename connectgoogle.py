@@ -219,9 +219,14 @@ class ConnectGoogle:
             :param bool toId : if toId is True, key of return dict is "sheetName"
             :return dict : sheetName ↔ sheetId
             """
-            response = (
-                self.service.spreadsheets().get(spreadsheetId=SPREADSHEETID).execute()
-            )
+            try:
+                response = (
+                    self.service.spreadsheets()
+                    .get(spreadsheetId=SPREADSHEETID)
+                    .execute()
+                )
+            except socket.timeout:
+                return self.get_sheets_dict(toId)
             sheets = {}
             for prop in response.get("sheets"):
                 if toId:

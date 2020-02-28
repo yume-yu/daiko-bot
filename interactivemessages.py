@@ -1,5 +1,6 @@
 import copy
 import datetime as dt
+import sys
 from ast import literal_eval
 from pprint import pprint
 
@@ -68,8 +69,8 @@ def get_block(
             return canceled
         else:
             return contract_shift(value, slack_id)
-    elif action_value == "show_shift":
-        return get_shift_image(slack_id)
+    elif action_value in ("show_shift", "switch_type"):
+        return get_shift_image(slack_id, value)
     else:
         return error_message
 
@@ -272,26 +273,49 @@ def contract_shift(target: dict, slackid: str) -> dict:
     return complate_request
 
 
-def get_shift_image(slackId):
+def get_shift_image(slackid, value):
     """
     シフト画像を生成,アップロードして画像を表示するメッセージを返す
 
-    :param str slackId : 呼び出したユーザーのslackId
+    :param str slackid : 呼び出したユーザーのslackid
     """
+    is_day = False
+    date = dt.datetime.now()
+    value_dict = {"date": None, "is_day": None}
+
+    print(value)
+    if "," in value.get("action_id"):
+        value_dict = csv_to_dict(value.get("action_id"))
+
+    if value.get("block_id") == "show_shift" and value.get("type") == "datepicker":
+        date = dt.datetime.strptime(value.get("selected_date"), "%Y-%m-%d")
+        is_day = literal_eval(value_dict.get("is_day"))
+    elif value.get("block_id") == "switch_type":
+        date = dt.datetime.strptime(value_dict.get("date"), "%Y-%m-%d")
+        is_day = literal_eval(value.get("value"))
+        print("ok, type is button")
+
     return_block = copy.deepcopy(show_shift)
-    uploaded_file = sc.generate_shiftimg_url()
-    while True:
-        try:
-            uploaded_file = sc.generate_shiftimg_url(
-                retry=True, filename=uploaded_file["filename"]
-            )
-        except FileNotFoundError as e:
-            print("ok,upload success.")
-            print(e)
-            break
+    if is_day:
+        shift = sc.get_shift(date=date, fill_blank=True)
+    else:
+        shift = sc.get_week_shift(
+            base_date=date, grouping_by_week=True, fill_blank=True
+        )
+    uploaded_file = sc.generate_shiftimg_url(shift=shift)
+    print("ok,upload success.")
     return_block["blocks"][0]["image_url"] = "{}".format(uploaded_file["url"])
     return_block["blocks"][0]["title"]["text"] = "{}".format(uploaded_file["filename"])
-    sc.record_use(slackId, sc.UseWay.BUTTONS, sc.Actions.SHOWSHIFT)
+    return_block["blocks"][2]["accessory"]["initial_date"] = date.strftime("%Y-%m-%d")
+    return_block["blocks"][2]["accessory"]["action_id"] = ",".join(
+        ["is_day", str(is_day), "date", date.strftime("%Y-%m-%d")]
+    )
+    return_block["blocks"][3]["elements"][0]["action_id"] = ",".join(
+        ["is_day", str(is_day), "date", date.strftime("%Y-%m-%d")]
+    )
+    return_block["blocks"][3]["elements"][0]["value"] = str(not is_day)
+    sc.record_use(slackid, sc.UseWay.BUTTONS, sc.Actions.SHOWSHIFT)
+    pprint(return_block)
     return return_block
 
 
@@ -529,6 +553,38 @@ show_shift = {
             "title": {"type": "plain_text", "text": "Example Image", "emoji": True},
             "image_url": "",
             "alt_text": "Example Image",
-        }
+        },
+        {"type": "divider"},
+        {
+            "block_id": "show_shift",
+            "type": "section",
+            "text": {"type": "mrkdwn", "text": "Pick a date for the deadline."},
+            "accessory": {
+                "type": "datepicker",
+                "action_id": "",
+                "initial_date": "",
+                "placeholder": {
+                    "type": "plain_text",
+                    "text": "Select a date",
+                    "emoji": True,
+                },
+            },
+        },
+        {
+            "block_id": "switch_type",
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "action_id": "a",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Switch day/week",
+                        "emoji": True,
+                    },
+                    "value": "click_me_123",
+                }
+            ],
+        },
     ],
 }
