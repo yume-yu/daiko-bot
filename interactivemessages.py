@@ -558,7 +558,7 @@ show_shift = {
         {
             "block_id": "show_shift",
             "type": "section",
-            "text": {"type": "mrkdwn", "text": "Pick a date for the deadline."},
+            "text": {"type": "mrkdwn", "text": "シフトを表示する日を選んでください"},
             "accessory": {
                 "type": "datepicker",
                 "action_id": "",
