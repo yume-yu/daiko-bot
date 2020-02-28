@@ -136,6 +136,7 @@ class ShiftController:
         GoogleCalendar上のEvent、もしくはEventのリストを受け取ってWorkオブジェクト、またはオブジェクトのリストを返す
         """
         if isinstance(event, dict):
+            pprint(event)
             worker_name: str = event.get("summary")
             work_start = dt.datetime.fromisoformat(event["start"]["dateTime"])
             work_end = dt.datetime.fromisoformat(event["end"]["dateTime"])
@@ -184,21 +185,15 @@ class ShiftController:
 
         if eventid is not None:
             print("have eventid")
-            if only_requested:
-                target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
-                print(target)
-                return target
-            elif only_active:
-                target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
-                return target
-            else:
-                target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
-                if target is not None:
-                    return self.convert_event_to_work(target)
+            print("request to DAIKO")
+            target = self.calendar.get_event(CALENDARID_DAIKO, eventid)
+            if target is not None and target.get("status") != "cancelled":
+                return self.convert_event_to_work(target)
 
-                target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
-                if target is not None:
-                    return self.convert_event_to_work(target)
+            print("request to SHIFT")
+            target = self.calendar.get_event(CALENDARID_SHIFT, eventid)
+            if target is not None and target.get("status") != "cancelled":
+                return self.convert_event_to_work(target)
 
             raise ValueError("Ths shift had eventid is none")
 
