@@ -18,12 +18,12 @@ with open("daiko-dict.csv", "w", encoding="utf-8") as file:
     file.write("見せ,トリガー-確認,ミセ\n")
     file.write("教え,トリガー-確認,オシエ\n")
     file.write("おしえ,トリガー-確認,オシエ\n")
-    file.write("明日,日付-曖昧,アシタ\n")
-    file.write("今日,日付-曖昧,キョウ\n")
-    file.write("本日,日付-曖昧,ホンジツ\n")
-    file.write("来週,日付-補助,来週\n")
-    file.write("から,時刻-補助,から\n")
-    file.write("まで,時刻-補助,まで\n")
+    file.write("明日,日付-曖昧,tomorrow\n")
+    file.write("今日,日付-曖昧,today\n")
+    file.write("本日,日付-曖昧,today\n")
+    file.write("来週,日付-補助,next\n")
+    file.write("から,時刻-補助,from\n")
+    file.write("まで,時刻-補助,until\n")
     for hour in range(0, 24):
         file.write(
             "{hour}時,時刻,{fix_hour:0=2}:00\n".format(
@@ -145,6 +145,6 @@ with open("daiko-dict.csv", "w", encoding="utf-8") as file:
         file.write("{day}日,日付-日,{day:0=2}\n".format(day=day))
         if day < 10:
             file.write("{day:0=2}日,日付-日,{day:0=2}\n".format(day=day))
-    for weekday in ["日", "月", "火", "水", "木", "金", "土"]:
-        file.write("{day}曜日,日付-曜日,{day}\n".format(day=weekday))
-        file.write("{day}曜,日付-曜日,{day}\n".format(day=weekday))
+    for key, weekday in enumerate(["日", "月", "火", "水", "木", "金", "土"]):
+        file.write("{day}曜日,日付-曜日,{key}\n".format(key=key, day=weekday))
+        file.write("{day}曜,日付-曜日,{key}\n".format(key=key, day=weekday))
