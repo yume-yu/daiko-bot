@@ -1,15 +1,14 @@
 import datetime as dt
 import json
 import os
-import socket
-import sys
 from enum import Enum, auto
 from pprint import pprint
 
 import requests
-from connectgoogle import TIMEZONE, ConnectGoogle
 from pytz import timezone
-from workmanage import DrawShiftImg, Shift, Work, Worker, Worktime
+
+from connectgoogle import TIMEZONE, ConnectGoogle
+from workmanage import DrawShiftImg, Work, Worker
 
 FONT = "./.fonts/mplus-1m-regular.ttf"
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
@@ -490,7 +489,7 @@ class ShiftController:
 
     # - 未着手ポイント -#
     def make_notice_message(
-        self, slackid: str, action: Actions, work: Worker, start, end, message
+        self, slackid: str, action: Actions, work: Work, start, end, message
     ):
         return_message = None
         if action is self.Actions.CONTRACT:
