@@ -5,6 +5,7 @@ from ast import literal_eval
 from pprint import pprint
 
 from settings import *
+from settings import sc
 from workmanage import Shift
 
 
