@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
 import datetime as dt
 import json
 import os
+import re
 import sys
+from ast import literal_eval
 from enum import Enum, auto
 from pprint import pprint
 
@@ -11,21 +14,47 @@ from pytz import timezone
 from connectgoogle import TIMEZONE
 from settings import (IM_OPEN, SLACK_BOT_TOKEN, TEMP_CONVERSATION_SHEET,
                       analyzer, header, sc)
+from workmanage import Work
+
+
+class UseWordCombination(Enum):
+    """
+
+    時刻の範囲作製に利用する単語のパターン
+
+    Attributes:
+        twotimes (int): 2つの時刻で作製する
+        time_and_range (int): 時刻と範囲指定で作製する
+        time_and_noun (int): 時刻と名詞で作製する
+        noun_and_range (int):  名詞と範囲指定で作製する
+        no_need (int): 範囲を作製する必要がない
+
+    """
+
+    twotimes = auto()
+    time_and_range = auto()
+    time_and_noun = auto()
+    noun_and_range = auto()
+    no_need = auto()
 
 
 class ActionNotFoundError(Exception):
+    """
+
+    Actionが見つからなかったときのException
+
+    """
+
     pass
 
 
-class EventNotFoundError(Exception):
-    pass
+class ShiftNotFoundError(Exception):
+    """
 
+    対象のシフトが見つからなかった時のException
 
-class InvalidFormatError(Exception):
-    pass
+    """
 
-
-class TargetIsPastError(Exception):
     pass
 
 
@@ -36,7 +65,7 @@ def get_temp_conversation(slackid: str) -> dict:
         "append_date": all_data[1][target_index],
         "action": all_data[2][target_index],
         "dates": all_data[3][target_index],
-        "times": all_data[4][target_index],
+        "time": all_data[4][target_index],
         "works": all_data[5][target_index],
         "text": all_data[6][target_index],
     }
@@ -47,7 +76,7 @@ def update_temp_conversation(
     slackid: str,
     action: sc.Actions = None,
     dates: list = [],
-    times: list = [],
+    time: dict = None,
     works: list = [],
     text: str = None,
 ):
@@ -59,13 +88,8 @@ def update_temp_conversation(
         ",".join([date.strftime("%m/%d") for date in dates])
         if len(dates) > 0
         else str(None),
-        ",".join(
-            [
-                '{{"start":{},"end":{}}}'.format(time["start"], time["end"])
-                for time in times
-            ]
-        )
-        if len(times) > 0
+        '{{"start":{},"end":{}}}'.format(time["start"], time["end"])
+        if time
         else str(None),
         ",".join([worktime.eventid for work in works for worktime in work.worktime])
         if len(works) > 0
@@ -105,6 +129,33 @@ def analyze_message(message: str):
     return token_list
 
 
+def cleansing_nouns(nouns: list):
+    """
+
+    抽出された名詞を時刻として使えるものだけに絞り込む
+
+    Args:
+        nouns (list): 「名詞」ラベルの付いたデータ
+
+    Returns:
+        list : %Hとして有効な数値だけを含んだ「名刺」ラベルのデータのリスト
+
+    """
+    if nouns is None:
+        return nouns
+
+    for noun in nouns:
+        try:
+            if sc.BEFORE_OPEN_TIME < int(noun.get("word")) <= sc.AFTER_CLOSE_TIME:
+                pass
+            else:
+                nouns.remove(noun)
+        except ValueError:
+            # intへのparseのエラーを握りつぶす
+            pass
+    return nouns
+
+
 def convert_str2action(action: str) -> sc.Actions:
     if action == "Actions.REQUEST":
         return sc.Actions.REQUEST
@@ -116,12 +167,16 @@ def convert_str2action(action: str) -> sc.Actions:
     return None
 
 
-def decide_action(words_count: dict):
+def decide_action(words_count: dict, recorded_action: sc.Actions):
     """
+
     与えられた対象単語の出現数から行動を決定して返す
 
-    :param dict words_count : 対象の単語の出現頻度の辞書
-    :return ShiftController.Actions : 推定される行動。確定できないときはNone
+    Args:
+        words_count (dict): 対象の単語の出現頻度の辞書
+
+    Returns:
+        ShiftController.Actions : 推定される行動
     """
     decided_action = None
 
@@ -143,491 +198,763 @@ def decide_action(words_count: dict):
         decided_action = sc.Actions.SHOWSHIFT
         return decided_action
 
+    # 見つからなければ記録されていたactionを採用
+    decided_action = recorded_action
+
     if decided_action is None:
         raise ActionNotFoundError()
 
     return decided_action
 
 
-def convert2valid_date(
-    date: str, day=None, weekday=None, weekday_attach=None, unclear=None
+def check_is_past(base: dt.datetime, date: str):
+    """check_is_past
+
+    受け取ったYYYY/mm/dd文字列が基準より過去であるかを精査し、過去であった場合は基準日の翌年の日付の文字列に変換して返す
+
+    Args:
+        base(datetime.datetime): 基準の日付。多くの場合呼び出した日付
+        date(str): チェック対象の文字列
+
+    Returns:
+        datetime.datetime : 基準日より未来である日付
+
+    """
+    target = dt.datetime.strptime(date, "%Y/%m/%d").astimezone(timezone(TIMEZONE))
+    if target < base:
+        return target.replace(year=base.year + 1)
+    else:
+        return target
+
+
+def parse_ymd_str(
+    date: str,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
 ):
-    """
-    与えら得た文字列を条件に沿ってもっともらしいdatetime.datetimeにする
+    """parse_ymd_str
 
-    :param str  date : 変換対象の文字列
-    :param bool day : 変換対象が"%d"のフォーマットであるか
-    :param bool weekday : 変換対象が"[日月火水木金土]"である
-    :param str  weekday_attach : 変換対象がweekdayのときに用いる補助要素
-    :param bool unclear : 変換対象は日付を表す曖昧表現である
+    受け取ったYYYY/mm/dd or mm/dd or dd文字列の不足を補い、datetime.datetimeに変換する。
+    年数の指定がない場合は指定の日付が過去であるかを精査し、過去であった場合は未来に変換する。
 
-    :return datetime.datetime : 変換後の日付
+    Args:
+        date(str): パース対象の文字列
+        base(datetime.datetime): 基準の日付。デフォルト値は呼び出した時
+
+    Returns:
+        datetime.datetime : フォーマットを揃えた日付
+
+    Raises:
+        ValueError: dateのフォーマットが不適切であった
+
+    Examples:
+        parse_ymd_str("2019/10/17")
+
+    Note:
+        daiko-dict.csvによって、フィルタした文字列のみが与えられる。パターンは以下の通り
+        * mm/dd
+        * dd
+
     """
-    print(date)
-    # 呼び出された日付と00:00時間、東京のタイムゾーンを持つ"today"をつくる
-    today = dt.datetime.now().astimezone(timezone(TIMEZONE))
-    today = dt.datetime.strptime(
-        "{}/{}/{}".format(today.year, today.month, today.day), "%Y/%m/%d"
+
+    if not isinstance(date, str):
+        return None
+
+    if re.compile(r"(\d){4}/(\d){2}/(\d){2}").search(date):
+        return dt.datetime.strptime(date, "%Y/%m/%d")
+    elif re.compile(r"(\d){2}/(\d){2}").search(date):
+        return check_is_past(base, "/".join([str(base.year), date]))
+    elif re.compile(r"((\d){2})|\d").search(date):
+        return check_is_past(base, "/".join([str(base.year), str(base.month), date]))
+
+    raise ValueError("{} is invalid format".format(date))
+
+
+def parse_unclear_date(
+    date: str,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
+):
+    """parse_unclear_date
+
+    受け取った曖昧表現の日付文字列をdatetime.datetimeに変換する。
+
+    Args:
+        date(str): パース対象の文字列
+        base(datetime.datetime): 基準の日付。デフォルト値は呼び出した時
+
+    Returns:
+        datetime.datetime : 解析結果の日付
+
+    Raises:
+        ValueError: 定義されていない型だった時
+
+    Examples:
+        parse_unclear_date("today")
+
+    Note:
+        daiko-dict.csvによって、フィルタした文字列のみが与えられる。パターンは以下の通り
+        * today
+        * tomorrow
+
+    """
+
+    if date == "today":
+        return base
+    elif date == "tomorrow":
+        return base + dt.timedelta(days=1)
+
+    raise ValueError("{} is invalid unclear date.")
+
+
+def parse_weekday(
+    weekday: str,
+    attach: str = None,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
+):
+    """parse_weekday
+
+    受け取った曜日から日付に変換する
+
+    Args:
+        date(str): 曜日情報 0=日曜日,6=土曜日 datetimeの%w基準
+        attach(str): 曜日に対する補足情報
+        base(datetime.datetime): 基準の日付。デフォルト値は呼び出した時
+
+    Returns:
+        datetime.datetime : フォーマットを揃えた日付
+
+    Examples:
+        parse_unclear_date("today")
+
+    Note:
+        attachにはdaiko-dict.csvによって、フィルタした文字列のみが与えられる。パターンは以下の通り
+        * next
+    """
+    week_diff = 0
+
+    # attachがnextなら1週間後ろにずらす
+    if attach == "next":
+        week_diff = 1
+
+    return (
+        base
+        + dt.timedelta(days=int(weekday) - int(base.strftime("%w")) + 7 * week_diff)
     ).astimezone(timezone(TIMEZONE))
 
-    target_date = None
 
-    # 日付かを見る
-    if day is None and weekday is None and unclear is None:
-        # -> date is MM/DD
-        try:
-            target_date = dt.datetime.strptime(
-                "/".join([str(today.year), date]), "%Y/%m/%d"
-            ).astimezone(timezone(TIMEZONE))
-        except ValueError:
-            raise InvalidFormatError()
-        # 過去の日付だった場合、1年後のものと解釈する
-        if target_date < today:
-            target_date = dt.datetime.strptime(
-                "{}/{}/{}".format(
-                    target_date.year + 1, target_date.month, target_date.day
-                ),
-                "%Y/%m/%d",
-            ).astimezone(timezone(TIMEZONE))
-
-        return target_date
-
-    if day:
-        # -> date is DD
-        try:
-            target_date = dt.datetime.strptime(
-                "/".join([str(today.year), str(today.month), date]), "%Y/%m/%d"
-            ).astimezone(timezone(TIMEZONE))
-        except ValueError:
-            raise InvalidFormatError()
-        # 過去の日付だった場合、1ヶ月後のものと解釈する
-        if target_date < today:
-            target_date = dt.datetime.strptime(
-                "{}/{}/{}".format(
-                    target_date.year, target_date.month + 1, target_date.day
-                ),
-                "%Y/%m/%d",
-            ).astimezone(timezone(TIMEZONE))
-
-        return target_date
-
-    if weekday:
-        # -> date is [月|火|水|木|金|土|日]
-        weedkay_list = ("日", "月", "火", "水", "木", "金", "土")
-        day_of_week = int(today.strftime("%w"))
-        print("day_of_week" + str(day_of_week))
-        tar_day_of_week = weedkay_list.index(date)
-        print("tar_day_of_week" + str(tar_day_of_week))
-        if weekday_attach:
-            target_date = today + dt.timedelta(days=7 + (tar_day_of_week - day_of_week))
-            target_date = target_date.astimezone(timezone(TIMEZONE))
-            return target_date
-        diff_of_today = tar_day_of_week - day_of_week
-        print(diff_of_today)
-        if diff_of_today >= 0:
-            target_date = today + dt.timedelta(days=diff_of_today)
-        else:
-            target_date = today + dt.timedelta(days=7 - diff_of_today)
-        target_date = target_date.astimezone(timezone(TIMEZONE))
-        return target_date
-
-    if unclear:
-        if date in ("今日", "本日"):
-            target_date = today
-        if date in ("明日"):
-            target_date = today + dt.timedelta(days=1)
-
-        target_date = target_date.astimezone(timezone(TIMEZONE))
-        return target_date
-
-
-def find_target_day(words: dict):
+def search_in_date_group(
+    dates: list = None,
+    days: list = None,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
+):
     """
-    与えら得た文字列群から日付を探してリストにする。
 
-    :param dict words : analyze_messageによって抽出された文字群
-    :return list<dt.datetime> : 見つかった日付のリスト
+    見つかった日付表現を探索してdatetime.datetimeへパースする
+
+    Args:
+        dates (list): 「日付」ラベルの付いたデータ
+        days (list): 「日付-日」ラベルの付いたデータ
+        base (datetime.datetime): パース時の基準にする日付
+
+    Returns:
+        list: 見つかったパース済みの日付(datetime.datetime)のリスト
+
+    """
+    dates_found = []
+
+    if dates:
+        for date in dates:
+            dates_found.append(parse_ymd_str(date.get("value"), base=base))
+        if dates_found:
+            return dates_found
+
+    if days:
+        for day in days:
+            dates_found.append(parse_ymd_str(day.get("value"), base=base))
+        if dates_found:
+            return dates_found
+
+    return dates_found
+
+
+def search_in_weekday_group(
+    weekdays: list,
+    attach: str,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
+):
+    """
+
+    見つかった曜日表現を探索してdatetime.datetimeへパースする
+
+    Args:
+        weekdays(list): 「日付-曜日」ラベルの付いたデータ
+        attach(list): 「日付-補助」ラベルの付いたデータ
+        base (datetime.datetime): パース時の基準にする日付
+
+    Returns:
+        list: 見つかったパース済みの日付(datetime.datetime)のリスト
+    """
+    dates_found = []
+
+    if weekdays:
+        for weekday in weekdays:
+            dates_found.append(
+                parse_weekday(weekday.get("value")),
+                attach=attach[0].get("value") if attach else None,
+                base=base,
+            )
+
+    return dates_found
+
+
+def search_in_unclear_group(
+    words: list,
+    base: dt.datetime = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    ),
+):
+    """
+
+    見つかった曖昧日付表現を探索してdatetime.datetimeへパースする
+
+    Args:
+        words(list): 「日付-曖昧」ラベルの付いたデータ
+        base (datetime.datetime): パース時の基準にする日付
+
+    Returns:
+        list: 見つかったパース済みの日付(datetime.datetime)のリスト
+    """
+    dates_found = []
+
+    if words:
+        for word in words:
+            dates_found.append(parse_unclear_date(word.get("value"), base=base))
+
+    return dates_found
+
+
+def find_target_day(words: dict, recorded_dates: list):
+    """
+
+    解析から得られたデータから対象となる日付を探す
+
+    Args:
+        words (dict): analyze_messageによって抽出された文字群
+        recorded_dates (list): temp_comversation("dates")に記録されていた日付のリスト
+
+    Returns:
+        list: 見つかった日付(datetime.datetime)のリスト
     """
 
     suspected_target = []
+    today = dt.datetime.combine(
+        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+    )
 
-    # まず%m/%dを確認
-    if words.get("日付"):
-        # 確実な日付があるのでいくつあるのか調べる
-        for day in words.get("日付"):
-            suspected_target.append(convert2valid_date(day.get("value")))
+    # まず %m/%d or %d を探索
+    suspected_target = search_in_date_group(
+        dates=words.get("日付"), days=words.get("日付-日"), base=today
+    )
+
+    # 対象が見つかったらreturn
+    if suspected_target:
         return suspected_target
 
-    # なければ%dを探す
-    elif words.get("日付-日"):
-        for day in words.get("日付-日"):
-            suspected_target.append(convert2valid_date(day.get("value"), day=True))
-        return suspected_target
-    else:
-        # それでもなければ曜日を探す
-        if words.get("日付-曜日"):
-            for day in words.get("日付-曜日"):
-                suspected_target.append(
-                    convert2valid_date(
-                        day.get("value"),
-                        weekday=True,
-                        weekday_attach=words.get("日付-補助")[0]["value"]
-                        if words.get("日付-補助")
-                        else False,
-                    )
-                )
+    # 曜日表現を探索
+    suspected_target = search_in_weekday_group(
+        weekdays=words.get("日付-曜日"), attach=words.get("日付-補助"), base=today
+    )
 
-        # それでもなければ曖昧表現を探す
-        if words.get("日付-曖昧"):
-            for day in words.get("日付-曖昧"):
-                suspected_target.append(
-                    convert2valid_date(day.get("word"), unclear=True)
-                )
-
-        if len(suspected_target) == 0:
-            suspected_target.append(convert2valid_date("今日", unclear=True))
+    # 対象が見つかったらreturn
+    if suspected_target:
         return suspected_target
 
+    # 曖昧日付表現を探索
+    suspected_target = search_in_unclear_group(words=words.get("日付-曖昧"), base=today)
 
-def find_target_time(words: dict, works: list) -> (list, list):
-    """
-    与えられた文字列から代行の開始/終了時間を探し、対象のシフトを絞り込む
+    # 対象が見つかったらreturn
+    if suspected_target:
+        return suspected_target
+
+    # 記録された日付があるならreturn
+    if recorded_dates:
+        return recorded_dates
+
+    # 何も見つからなければ今日を対象とする
+    suspected_target.append(today)
+    return suspected_target
+
+
+def check_args_for_time_range(times: list, attach: list, noun: list):
     """
 
-    class UseWordCombination(Enum):
-        ONETIME_PLUS_RANGE = auto()
-        TWOTIMES = auto()
+    時間範囲に関連するワードの発見数を精査し、作製のパターンを決定する
 
-    ordered_word_list = words.get("all")
-    count_doubtful_str = 0
-    times = {"start": None, "end": None}
-    combination = None
-    times_list = []
+    Args:
+        times (list): 「時刻」ラベルの付いたデータのリスト
+        attach (list): 「時刻-補助」ラベルの付いたデータのリスト
+        noun (list): 「名詞」ラベルの付いたデータのリスト
 
-    # 仮range作成開始
+    Returns:
+        UseWordCombination : 時間範囲作製に使われるデータのパターン
 
-    # 時刻は何個あるか
-    if words.get("時刻"):
-        count_doubtful_str = len(words.get("時刻"))
+    Raises:
+        ValueError : 要素の数がUseWordCombinationに規定されたどのパターンにも当てはまらない
+    """
+    if len(times) == 2:
+        return UseWordCombination.twolen(times)
 
-    # 時刻として扱える語が2つあるときは、それでrange
-    if count_doubtful_str == 2:
-        combination = UseWordCombination.TWOTIMES
-        times["start"] = words.get("時刻")[0]["value"]
-        times["end"] = words.get("時刻")[1]["value"]
-    # 時刻として扱える語が1つしかないとき
-    elif count_doubtful_str == 1:
-        # 時間の範囲を示す語があるか
-        if words.get("時刻-補助"):
-            # 範囲を示す語が1つだけふくまれているか
-            if len(words.get("時刻-補助")) == 1:
-                combination = UseWordCombination.ONETIME_PLUS_RANGE
-                if words.get("時刻-補助")[0]["word"] == "まで":
-                    times["end"] = words.get("時刻")[0]["value"]
-                if words.get("時刻-補助")[0]["word"] == "から":
-                    times["start"] = words.get("時刻")[0]["value"]
-        # ただの数字があるか
-        if words.get("名詞"):
-            # あったら、時間として適切なものはいくつあるか
-            for number in words.get("名詞"):
-                if 0 <= number <= 19:
-                    pass
-                else:
-                    words.remove(number)
+    if len(times) == len(attach) == 1:
+        return UseWordCombination.time_and_range
 
-            # 1つなら今あるものと合わせて2つでrange
-            if len(words.get("名詞")) == 1:
-                combination = UseWordCombination.TWOTIMES
-                if ordered_word_list.index(
-                    words.get("名詞")[0]["words"]
-                ) < ordered_word_list.index(words.get("時刻")[0]["words"]):
-                    times["start"] = "{}:00".format(words.get("名詞")[0]["words"])
-                    times["end"] = words.get("時刻")[0]["value"]
-                else:
-                    times["start"] = words.get("時刻")[0]["value"]
-                    times["end"] = "{}:00".format(words.get("名詞")[0]["words"])
+    if len(times) == len(noun) == 1:
+        return UseWordCombination.time_and_noun
 
-    # そもそも時刻として有効なものがなかった
-    elif count_doubtful_str == 0:
-        # ただの数字があるか
-        if words.get("名詞"):
-            # あったら、時間として適切なものはいくつあるか
-            for number in words.get("名詞"):
-                if 0 <= number <= 19:
-                    pass
-                else:
-                    words.remove(number)
+    if len(noun) == len(attach) == 1:
+        return UseWordCombination.time_and_noun
 
-            # 1つなら時間の範囲を示す語があるか確認
-            if len(words.get("名詞")) == 1:
-                # 時間の範囲を示す語があるか
-                if words.get("時刻-補助"):
-                    # 範囲を示す語が1つだけふくまれているか
-                    if len(words.get("時刻-補助")) == 1:
-                        combination = UseWordCombination.ONETIME_PLUS_RANGE
-                        if words.get("時刻-補助")[0]["word"] == "まで":
-                            times["end"] = "{}:00".format(words.get("名詞")[0]["words"])
-                        if words.get("時刻-補助")[0]["word"] == "から":
-                            times["start"] = "{}:00".format(words.get("名詞")[0]["words"])
-            # 2つあるならそれをもってrange
-            elif len(words.get("名詞")) == 2:
-                combination = UseWordCombination.TWOTIMES
-                times["start"] = "{}:00".format(words.get("名詞")[0]["words"])
-                times["end"] = "{}:00".format(words.get("名詞")[1]["words"])
+    if len(attach) == len(times) == 0:
+        return UseWordCombination.no_need
 
-    # 仮range作成おわり
+    raise ValueError("Too many word relation time")
 
-    # この時点で仮のrangeを作れていなかったらError
-    if combination is None:
-        raise ValueError("there is 3 or more/less words about times")
 
-    # 対象のシフトが見つかっていないなら、そのまま返す
-    if len(works) == 0:
-        return works, [times]
+def search_in_time_group(times: list, attach: list, noun: list):
+    """
 
-    pprint(works)
-    # すべての対象になりうるシフトを確認して時間帯と合うか検証する
-    for work in works:
-        # 対象のシフトから時間を抽出
-        work_start = work.worktime[0].start.time()
-        work_end = work.worktime[0].end.time()
+    見つかった時刻の表現から時刻の範囲を作製する
 
-        # 作成した時間帯をtimeにパース。このときNoneが入っていたらworktimeに合わせる
-        target_start = (
-            dt.time(
-                int(times["start"].split(":")[0]), int(times["start"].split(":")[1])
-            )
-            if times["start"] is not None
-            else work_start
+    Args:
+        times (list): 「時刻」ラベルの付いたデータ
+        attach (list): 「時刻-補助」ラベルの付いたデータ
+        noun (list): 「名詞」ラベルの付いたデータ
+
+    Returns:
+        dict : {"start": %H:%M, "end": %H:%M}
+        None : 時間を表す語が一切なかった時
+
+    Note:
+        採用される優先度は
+        時刻2つ > 時刻+補助 > 時刻+数詞
+    """
+
+    # 作製パターンを確認
+    pattern = check_args_for_time_range(
+        times if times else [], attach if attach else [], noun if noun else []
+    )
+
+    # 戻り値の雛形
+    time_range = {"start": None, "end": None}
+
+    if pattern is UseWordCombination.twotimes:
+        time_range["start"] = times[0]["value"]
+        time_range["end"] = times[1]["value"]
+        return time_range
+
+    if pattern is UseWordCombination.time_and_range:
+        time_range["end"] = times[0]["value"] if attach[0]["value"] == "until" else None
+        time_range["start"] = (
+            times[0]["value"] if attach[0]["value"] == "from" else None
         )
-        target_end = (
-            dt.time(int(times["end"].split(":")[0]), int(times["end"].split(":")[1]))
-            if times["end"] is not None
-            else work_end
+        return time_range
+
+    if pattern is UseWordCombination.time_and_noun:
+        time_range["start"] = (
+            times[0].get("value")
+            if int(times[0].get("value").split(":")[0]) < int(noun[0].get("word"))
+            else ":".join([noun[0].get("word"), "00"])
         )
+        time_range["end"] = (
+            times[0].get("value")
+            if int(times[0].get("value").split(":")[0]) > int(noun[0].get("word"))
+            else ":".join([noun[0].get("word"), "00"])
+        )
+        return time_range
 
-        # 時間帯とシフトが噛み合っているか確認する
-        # シフト開始時間が予定開始時刻より過去、もしくはシフト終了時間が予定終了時刻より未来であるか
-        if work_start > target_start or target_end > work_end:
-            # そうであったなら不適切なシフトなので対処から除外
-            works.remove(work)
-        else:
-            # そうでなかったなら適正なので、対応するworkと同じindexにそのときのtimesを保存する
-            times_list.append(
-                {
-                    "start": target_start.strftime("%H:%M"),
-                    "end": target_end.strftime("%H:%M"),
-                }
-            )
+    if pattern is UseWordCombination.noun_and_range:
+        time_range["start"] = (
+            ":".join([noun[0].get("word"), "00"])
+            if attach[0]["value"] == "from"
+            else None
+        )
+        time_range["end"] = (
+            ":".join([noun[0].get("word"), "00"])
+            if attach[0]["value"] == "until"
+            else None
+        )
+        return time_range
 
-    return works, times_list
-
-
-def check_exist_work(date: dt.datetime, slackid: str, action: sc.Actions):  # -> Worker
-    if action is sc.Actions.REQUEST:
-        return [sc.get_shift_by_date(date, slackid)]
-    elif action is sc.Actions.CONTRACT:
-        return sc.get_request_by_date(date)
-    else:
+    if pattern is UseWordCombination.no_need:
         return None
 
 
-def do_action(message_data, action: sc.Actions, date, time, work, text):
-    # message.reply(" ".join([str(action), str(date), str(time), str(work)]))
-    slackid = message_data["event"]["user"]
-    if action is sc.Actions.SHOWSHIFT:
-        sc.init_shift(date.strftime("%Y-%m-%d"))
-        image = sc.generate_shiftimg_url()
-        while True:
-            try:
-                image = sc.generate_shiftimg_url(retry=True, filename=image["filename"])
-            except FileNotFoundError as e:
-                print("ok,upload success.")
-                print(e)
-                break
-        pprint(image)
-        sc.post_message(
-            "{}の週のシフトです".format(date.strftime("%Y/%m/%d")),
-            attachments=[{"image_url": image["url"], "fields": []}],
-            channel=message_data["event"]["channel"],
-            ts=message_data["event"]["ts"],
+def find_target_time(words: dict, record_range: dict):
+    """
+
+    与えられた文字列から代行の開始/終了時間を探索する
+
+    Args:
+        words (dict): analyze_messageによって抽出された文字群
+        record_range (dict): temp_comversation("time")に記録された時間の範囲
+
+    Returns:
+        dict : {"start": None, "end": None}のdict
+        None : 時間を表す語が一切なかった時
+
+    Raises:
+        ValueError :  対応する時刻範囲がなかった時
+    """
+
+    try:
+        time_range = search_in_time_group(
+            times=words.get("時刻"), attach=words.get("時刻-補助"), noun=words.get("名詞")
         )
-        sc.record_use(slackid, sc.UseWay.CHAT, action)
-    elif action is sc.Actions.REQUEST:
-        if not time:
-            time = {"start": work.worktime[0].start, "end": work.worktime[0].end}
-        sc.request(
-            work.worktime[0].eventid,
-            time["start"]
-            if type(time["start"]) is str
-            else time["start"].strftime("%H:%M"),
-            time["end"] if type(time["end"]) is str else time["end"].strftime("%H:%M"),
+        return time_range
+    except ValueError:
+        if record_range:
+            return record_range
+        else:
+            raise ValueError("can't find time range")
+
+
+def find_target_work(works: list, time_range: dict, action: sc.Actions):
+    """
+
+    worksの中からtime_rangeに該当するworkのリストを返す
+
+    Args:
+        works (list): check_exist_workで取得したWork型のリスト
+        time_range (dict): find_target_timeで取得した時間の範囲
+        action (ShiftController.Actions): 呼び出し元の利用目的
+
+    Returns:
+        list : time_rangeに該当するシフト(Work型)のリスト
+
+    """
+    if action is sc.Actions.SHOWSHIFT or time_range is None:
+        return works
+
+    # time_rangeの中身をdt.timeに変換
+    time_range = {
+        "start": dt.time(
+            hour=int(time_range.get("start").split(":")[0]),
+            minite=int(time_range.get("start").split(":")[1]),
         )
-        notice_message = sc.make_notice_message(
-            slackid, action, work, time["start"], time["end"], text
+        if time_range.get("end")
+        else None,
+        "end": dt.time(
+            hour=int(time_range.get("end").split(":")[0]),
+            minite=int(time_range.get("end").split(":")[1]),
         )
-        sc.post_message(notice_message)
-        sc.record_use(slackid, sc.UseWay.CHAT, action)
+        if time_range.get("end")
+        else None,
+    }
+
+    for work in works:
+        start = (
+            time_range.get("start") if time_range.get("start") else work.start.time()
+        )
+        end = time_range.get("end") if time_range.get("end") else work.end.time()
+        if start < work.start.time() or work.end.time < end:
+            works.remove(work)
+
+    if len(works) == 0:
+        raise ShiftNotFoundError()
+    elif len(works) > 1:
+        raise ValueError()
+
+    return works
+
+
+def check_exist_work(dates: list, slackid: str, action: sc.Actions):
+    """
+    指定された日付とアクションに対応するシフトを返す
+
+    Args:
+        dates (list): シフトを探す日付のリスト
+        slackid (str): 検索対象のユーザーのslackid
+        action (ShiftController.Actions): 呼び出し元の利用目的
+
+    Returns:
+        list: 見つかったシフトのリスト
+    """
+    work_found = []
+
+    if action is sc.Actions.REQUEST:
+        for date in dates:
+            work_found.append(
+                sc.get_shift(date=date, slackid=slackid, only_active=True)
+            )
     elif action is sc.Actions.CONTRACT:
-        if not time:
-            time = {"start": work.worktime[0].start, "end": work.worktime[0].end}
-        sc.contract(
-            work.worktime[0].eventid,
-            slackid,
-            time["start"]
-            if type(time["start"]) is str
-            else time["start"].strftime("%H:%M"),
-            time["end"] if type(time["end"]) is str else time["end"].strftime("%H:%M"),
+        for date in dates:
+            work_found.append(sc.get_shift(date=date, only_requested=True))
+
+    if action is not sc.Actions.SHOWSHIFT and len(work_found) == 0:
+        raise ShiftNotFoundError()
+
+    return work_found
+
+
+def do_action(
+    slackid: str,
+    action: sc.Actions,
+    date: dt.datetime,
+    work: Work,
+    time_range: dict,
+    text: str,
+    ts: str,
+    receive_channel: str,
+):
+    """
+
+    情報をもとにactionに対応した処理を行う
+
+
+    Args:
+        slackid (str): ユーザーのslackid
+        action (ShiftController.Actions): メッセージから判定した処理
+        date (datetime.datetime): メッセージから判定した日付
+        work (Work): メッセージから抽出したシフト
+        time_range (dict): メッセージから抽出した時間範囲 {"start": %H:%M, "end": %H:%M}
+        text (str): メッセージの本文
+        ts (str): メッセージのタイムスタンプ
+        receive_channel (str): メッセージを受け取ったチャンネルのchannel id
+
+    """
+    if action is sc.Actions.SHOWSHIFT:
+        image = sc.generate_shiftimg_url(shift=sc.get_shift(date=date, fill_blank=True))
+        print(image, file=sys.stderr)
+        sc.post_message(
+            "{}のシフトです".format(date.strftime("%Y/%m/%d")),
+            attachments=[{"image_url": image["url"], "fields": []}],
+            channel=receive_channel,
+            ts=ts,
         )
-        notice_message = sc.make_notice_message(
-            slackid, action, work, time["start"], time["end"], text
-        )
-        sc.post_message(notice_message)
+
+    else:
+        if not time_range:
+            time_range = {"start": work.start, "end": work.end}
+        if action is sc.Actions.REQUEST:
+            sc.request(
+                work.eventid,
+                time_range["start"].strftime("%H:%M"),
+                time_range["end"].strftime("%H:%M"),
+            )
+        elif action is sc.Actions.CONTRACT:
+            sc.contract(
+                work.eventid,
+                slackid,
+                time_range["start"].strftime("%H:%M"),
+                time_range["end"].strftime("%H:%M"),
+            )
+
+            notice_message = sc.make_notice_message(
+                slackid, action, work, time_range["start"], time_range["end"], text
+            )
+            sc.post_message(notice_message)
+
         sc.record_use(slackid, sc.UseWay.CHAT, action)
+
+
+def get_user_dm_channel(slackid: str):
+    """
+    指定されたslackidのユーザーとbotのDMチャンネルのchannel idを取得する
+
+    Args:
+        slackid (str): 対象のユーザーのslackid
+
+    Returns:
+        str : ユーザーとのDM channelのid
+    """
+    print(
+        json.loads(
+            requests.post(
+                IM_OPEN,
+                json=json.loads(
+                    json.dumps({"token": SLACK_BOT_TOKEN, "user": slackid})
+                ),
+                headers=header,
+            ).text
+        )
+    )
+    return (
+        json.loads(
+            requests.post(
+                IM_OPEN,
+                json=json.loads(
+                    json.dumps({"token": SLACK_BOT_TOKEN, "user": slackid})
+                ),
+                headers=header,
+            ).text
+        )
+        .get("channel")
+        .get("id")
+    )
+
+
+def check_in_sequence(timestamp: str):
+    """
+
+    タイムスタンプから会話が進行中であるかを判定する
+
+    Args:
+        timestamp (str): temp_comversation.get("append_date")に記録された最終更新時間
+
+    Returns:
+        bool: 会話が進行中であるか
+    """
+    # 最終書き込み時刻を確認 比較対象datetime.isoformat() (ex:2021-03-01T00:00:00+09:00)
+    if re.compile(r"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}").search(timestamp):
+        if dt.datetime.now().astimezone(timezone(TIMEZONE)) - dt.datetime.fromisoformat(
+            timestamp
+        ) < dt.timedelta(minutes=10):
+            return True
+
+    return False
 
 
 def start_chatmessage_process(message_data: dict):
+    """
+
+    チャット形式のメッセージを受け取った時にスレッド実行されるメソッド
+
+    Args:
+        message_data(dict): Slackから受け取ったメッセージのデータ
+
+    Returns:
+        str: 空("")を返す
+
+    Note:
+    """
     # 必要な情報を抜き出す
-    bot_userid = message_data["authed_users"][0]
-    user_slackid = message_data["event"].get("user")
-    if user_slackid is None:
-        return ""
-    pprint(message_data)
-    text = message_data["event"]["text"].replace("<@{}>".format(bot_userid), "")
-    ts = message_data["event"]["ts"]
-    received_channel = message_data["event"]["channel"]
-    # DMのチャンネルを取得
-    dm_channel = json.loads(
-        requests.post(
-            IM_OPEN,
-            json=json.loads(
-                json.dumps({"token": SLACK_BOT_TOKEN, "user": user_slackid})
-            ),
-            headers=header,
-        ).text
-    )["channel"]["id"]
+    bot_userid = message_data.get("authed_users")[0]
+    user_slackid = message_data.get("event").get("user")
+    text = message_data.get("event").get("text").replace("<@{}>".format(bot_userid), "")
+    ts = message_data.get("event").get("ts")
+    receive_channel = message_data.get("event").get("channel")
+    receive_channel_type = message_data["event"].get("channel_type")
+    dm_channel = get_user_dm_channel(slackid=user_slackid)
+    del message_data
 
     # 処理開始
     words = analyze_message(text)
+    words["名詞"] = cleansing_nouns(words.get("名詞"))
     action = None
     dates = []
     times = []  # {"start":"HH:MM","end":"HH:MM"}
     works = []
     giveup_flag = False
-    is_sequence = False
+    is_sequence = False  # 連続した会話の途中であるフラグ
 
+    # 一時記憶の呼び出しと会話中の判定
     temp_comversation = get_temp_conversation(user_slackid)
-    if temp_comversation["append_date"] != "None":
-        if dt.datetime.now().astimezone(timezone(TIMEZONE)) - dt.datetime.fromisoformat(
-            temp_comversation["append_date"]
-        ) < dt.timedelta(minutes=10):
-            is_sequence = True
+    is_sequence = check_in_sequence(temp_comversation.get("append_date"))
 
+    # actionを判定
     try:
-        action = decide_action(words)
+        action = decide_action(
+            words,
+            recorded_action=convert_str2action(
+                temp_comversation.get("action") if is_sequence else None
+            ),
+        )
     except ActionNotFoundError:
-        if is_sequence:
-            action = convert_str2action(temp_comversation["action"])
-        if not action:
-            sc.post_message(
-                "メッセージからアクションが読み取れませんでした。ひょっとして業務外のお話ですか?",
-                channel=dm_channel,
-                ts=ts if message_data["event"].get("channel_type") == "im" else None,
-            )
-            return
-
-    dates = find_target_day(words)
-    if (
-        (
-            len(dates) == 0
-            or (
-                len(dates) == 1
-                and dates[0] - dt.datetime.now().astimezone(timezone(TIMEZONE))
-                < dt.timedelta(minutes=5)
-            )
+        sc.post_message(
+            "メッセージからアクションが読み取れませんでした。ひょっとして業務外のお話ですか?",
+            channel=dm_channel,
+            ts=ts if receive_channel_type == "im" else None,
         )
-        and temp_comversation["dates"] != "None"
-        and is_sequence
-    ):
-        dates.remove(dates[0])
-        dates.extend(
-            convert2valid_date(string_date)
-            for string_date in temp_comversation["dates"].split(",")
-        )
-    for date in dates:
-        try:
-            work = check_exist_work(date, user_slackid, action)
-            if work:
-                works.extend(work)
-        except ValueError:
-            pass
+        return ""
 
-    # 対象になりうるシフトがあるかどうか
-    if len(works) == 0 and action is not sc.Actions.SHOWSHIFT:
+    # 日付を探索
+    dates = find_target_day(
+        words,
+        recorded_dates=[
+            dt.datetime.fromisoformat(date)
+            for date in temp_comversation.get("dates").split(",")
+        ]
+        if is_sequence
+        else None,
+    )
+
+    # 対象のシフトの存在を確認
+    try:
+        works = check_exist_work(dates, user_slackid, action)
+    except ShiftNotFoundError:
         sc.post_message(
             "{}には有効な対象がありません。日付を間違えていませんか?".format(
                 ",".join([date.strftime("%m/%d") for date in dates])
             ),
             channel=dm_channel,
-            ts=ts if message_data["event"].get("channel_type") == "im" else None,
+            ts=ts if receive_channel_type == "im" else None,
         )
-        giveup_flag = True
-
-    # 時刻を示す文言が文中に存在する時はそれを範囲指定と判断し、範囲を取りworksとの整合性をとる
-    if words.get("時刻") or words.get("名詞"):
-        try:
-            # 1回目でworksとの整合性をとる。
-            works, times = find_target_time(words, works)
-            # 2回目をすると、workが空になった時でもtimesの中身が保たれる
-            works, times = find_target_time(words, works)
-        except ValueError:
-            sc.post_message(
-                "時間の指定があるようですが時間が正確に判別できませんでした。指定する時間をDMで教えて下さい。",
-                channel=dm_channel,
-                ts=ts if message_data["event"].get("channel_type") == "im" else None,
-            )
-            giveup_flag = True
-
-    if giveup_flag:
-        update_temp_conversation(user_slackid, action, dates, times, works, text)
+        update_temp_conversation(
+            slackid=user_slackid, action=action, dates=dates, text=text
+        )
         return ""
 
-    # worksが1つだけみつかっていて、timesが1つ(範囲が1つみつかった)ないしは0(範囲指定がなかった)とき
-    if (len(works) == 1 and len(times) <= 1) or action is sc.Actions.SHOWSHIFT:
-        update_temp_conversation(user_slackid)
-        do_action(
-            message_data,
-            action,
-            works[0].worktime[0].start if len(works) != 0 else dates[0],
-            times[0] if len(times) == 1 else None,
-            works[0] if len(works) != 0 else None,
-            text if is_sequence == False else temp_comversation["text"],
+    try:
+        time_range = find_target_time(
+            words, literal_eval(temp_comversation.get("time"))
         )
-    # workが見つからなかったとき
-    elif len(works) == 0:
-        update_temp_conversation(user_slackid, action, dates, times, works, text)
+    except ValueError:
+        sc.post_message(
+            "時間の指定があるようですが時間が正確に判別できませんでした。指定する時間をDMで教えて下さい。",
+            channel=dm_channel,
+            ts=ts if receive_channel_type == "im" else None,
+        )
+        update_temp_conversation(
+            slackid=user_slackid, action=action, dates=dates, time=time_range, text=text
+        )
+        return ""
+
+    try:
+        works = find_target_work(works, time_range, action)
+    except (ShiftNotFoundError, ValueError) as e:
+        update_temp_conversation(
+            slackid=user_slackid,
+            action=action,
+            dates=dates,
+            times=time_range,
+            text=text,
+        )
         sc.post_message(
             "日付{}と時間{}に対応するシフトがありませんでした。DMでシフトの日付、必要ならば時間も教えてください".format(
                 ",".join([date.strftime("%Y/%m/%d") for date in dates]),
-                "{}~{}".format(times[0]["start"], times[0]["end"])
-                if len(times) > 0
-                else "指定なし",
-            ),
-            channel=dm_channel,
-            ts=ts if message_data["event"].get("channel_type") == "im" else None,
-        )
-    elif len(works) >= 2:
-        update_temp_conversation(user_slackid, action, dates, times, works, text)
-        sc.post_message(
-            "対応するシフトが複数見つかりました。DMで日付や時間を教えて貰えれば絞り込めるかもしれません。\n日付:{}\n時間:{}".format(
+                "{}~{}".format(time_range["start"], time_range["end"]),
+            )
+            if isinstance(e, ShiftNotFoundError)
+            else "対応するシフトが複数見つかりました。DMで日付や時間を教えて貰えれば絞り込めるかもしれません。\n日付:{}\n時間:{}".format(
                 ",".join([date.strftime("%Y/%m/%d") for date in dates]),
                 "{}~{}".format(times[0]["start"], times[0]["end"])
                 if len(times) > 0
                 else "指定なし",
             ),
             channel=dm_channel,
-            ts=ts if message_data["event"].get("channel_type") == "im" else None,
+            ts=ts if receive_channel_type == "im" else None,
         )
+        return ""
+
+    update_temp_conversation(user_slackid)
+    do_action(
+        slackid=user_slackid,
+        action=action,
+        date=dates[0],
+        time_range=time_range,
+        work=works[0] if len(works) != 0 else None,
+        text=text,
+        ts=ts,
+        receive_channel=receive_channel,
+    )
 
     return ""
 
