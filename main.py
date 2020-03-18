@@ -64,48 +64,7 @@ def validate_token(token: str):
         return False
 
 
-def validate_request(responce_data: dict, state: dict) -> list:
-
-    base_start = dt.datetime.strptime(str(state["start"]), "%H:%M")
-    base_end = dt.datetime.strptime(str(state["end"]), "%H:%M")
-
-    error_list = []
-    request_start = None
-    request_end = None
-
-    # 開始時間のvalidate
-    try:
-        request_start = dt.datetime.strptime(responce_data["start_time"], "%H:%M")
-        if request_start < base_start:
-            error_list.append({"name": "start_time", "error": "開始時間が本来のそれより前です"})
-    except ValueError:
-        error_list.append({"name": "start_time", "error": "時間の形式が間違っています"})
-
-    # 終了時間のvalidate
-    try:
-        request_end = dt.datetime.strptime(responce_data["end_time"], "%H:%M")
-        if base_end < request_end:
-            error_list.append({"name": "end_time", "error": "終了時間が本来のそれより後です"})
-    except ValueError:
-        error_list.append({"name": "end_time", "error": "時間の形式が間違っています"})
-
-    try:
-        if (request_start.strftime("%H:%M") != base_start.strftime("%H:%M")) and (
-            request_end.strftime("%H:%M") != base_end.strftime("%H:%M")
-        ):
-            error_list.append({"name": "start_time", "error": "時間の範囲が不適切です"})
-            error_list.append({"name": "end_time", "error": "時間の範囲が不適切です"})
-        elif (request_start > base_end) or (request_end < base_start):
-            error_list.append({"name": "start_time", "error": "時間の範囲が不適切です"})
-            error_list.append({"name": "end_time", "error": "時間の範囲が不適切です"})
-    except AttributeError:
-        # datetimeにパースできなかったとき
-        pass
-
-    return error_list
-
-
-def validate_contract(responce_data: dict, state: dict) -> list:
+def validate_requesttimes(responce_data: dict, state: dict) -> list:
 
     base_start = dt.datetime.strptime(str(state["start"]), "%H:%M")
     base_end = dt.datetime.strptime(str(state["end"]), "%H:%M")
@@ -165,10 +124,8 @@ def check_post():
         state = csv_to_dict(get_json["state"])
 
         error_list = []
-        if get_json["callback_id"] == "Request":
-            error_list = validate_request(responce_data, state)
-        elif get_json["callback_id"] == "Contract":
-            error_list = validate_contract(responce_data, state)
+        if get_json["callback_id"] in ("Request", "Contract"):
+            error_list = validate_requesttimes(responce_data, state)
         elif get_json["callback_id"] == "Addname":
             use_db.add(get_json["user"]["id"], responce_data["name"])
             return_block = get_block("select_action", value=responce_data["name"])
