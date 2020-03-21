@@ -14,6 +14,7 @@ from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from pytz import timezone
+
 from workmanage import DrawShiftImg, Shift, Work, Worker, Worktime
 
 socket.setdefaulttimeout(10)
@@ -106,7 +107,28 @@ class ConnectGoogle:
             start: dt.datetime,
             end: dt.datetime,
             description: str,
+            recurrence: str = None,
         ):
+            """
+
+            GoogleCalendarにイベントを追加する
+
+            Args:
+                calendar (str): イベントを追加するカレンダーのcalendar id
+                summary (str): イベントのタイトルにする文章
+                start (datetime.datetime): イベントの開始日時
+                end (datetime.datetime): イベントの終了日時
+                description (str): イベントの詳細/メモ欄に書き込む文章
+                recurrence (str): イベントの繰り返し設定 RFC5545に準拠したフォーマットの文字列
+
+            Returns:
+                dict : APIから返答された、作製したイベントの情報
+
+            Examples:
+
+            Note:
+                timeout検出時は再帰的に自身を呼び出しリトライする
+            """
             start = start.astimezone(timezone(TIMEZONE)).isoformat()
             end = end.astimezone(timezone(TIMEZONE)).isoformat()
             event = {
@@ -115,6 +137,10 @@ class ConnectGoogle:
                 "start": {"dateTime": start, "timeZone": TIMEZONE},
                 "description": description,
             }
+
+            if recurrence:
+                event["recurrence"] = [recurrence]
+
             try:
                 event = (
                     self.service.events()
