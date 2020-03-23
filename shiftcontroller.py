@@ -92,6 +92,9 @@ class ShiftController:
     def slackid2name(self, slackId: str):
         return self.sheet.get_slackId2name_dict()[slackId]
 
+    def name2slackid(self, name: str):
+        return self.sheet.get_slackId2name_dict(toName=True)[name]
+
     def convert_utc_format(self, target: dt.datetime):
         return_value = (
             target.astimezone(timezone("UTC")).isoformat().replace("+00:00", "") + "Z"
