@@ -10,7 +10,6 @@ from pprint import pprint
 
 import requests
 
-from connectgoogle import TIMEZONE
 from settings import (IM_OPEN, SLACK_BOT_TOKEN, TEMP_CONVERSATION_SHEET,
                       analyzer, header, sc)
 from workmanage import Work

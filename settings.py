@@ -1,17 +1,19 @@
+import datetime as dt
 import os
 
-import make_dict
-import shiftcontroller
-from connectgoogle import TIMEZONE
 from janome.analyzer import Analyzer
 from janome.charfilter import *
 from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
 from pytz import timezone
 
+import make_dict
+import shiftcontroller
+
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_VALID_TOKEN = os.environ["SLACK_VALID_TOKEN"]
 ADD_TOKEN = os.environ["ADD_TOKEN"]
+JST = dt.timezone(dt.timedelta(hours=9), name="Asia/Tokyo")
 header = {
     "Content-type": "application/json",
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
@@ -48,5 +50,4 @@ analyzer = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS
 )
 
-sc = shiftcontroller.ShiftController()
-TIMEZONE = TIMEZONE
+sc = shiftcontroller.ShiftController(timezone=JST)
