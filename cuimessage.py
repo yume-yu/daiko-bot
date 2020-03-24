@@ -6,8 +6,8 @@ from enum import Enum, auto
 from pprint import pprint
 
 import requests
-from pytz import timezone
-from settings import TIMEZONE, sc
+
+from settings import sc
 from workmanage import Shift, Work
 
 D_HELPMSG = "\n".join(
@@ -199,18 +199,18 @@ def can_parse_date(string: str, today: dt):
     date = None
     # yyyy-mm-dd形式であるかを確認
     if re.search(r"2[0-9]{3}-((0[0-9])|1([0-2]))-(([0-2][0-9])|(3[0-1]))$", string):
-        date = dt.datetime.strptime(string, "%Y-%m-%d").astimezone(timezone(TIMEZONE))
+        date = dt.datetime.strptime(string, "%Y-%m-%d").astimezone(sc.timezone)
         return date
     # mm-dd形式であるかを確認
     elif re.search(r"([0-9]|(0[0-9])|1([0-2]))-(([0-2][0-9])|(3[0-1]))$", string):
         date = dt.datetime.strptime(
             "{}-{}".format(today.year, string), "%Y-%m-%d"
-        ).astimezone(timezone(TIMEZONE))
+        ).astimezone(sc.timezone)
         # もし、今日から1週間以上前の日付であれば来年のものとして扱う
         if date < today - dt.timedelta(days=7):
             date = dt.datetime.strptime(
                 "{}-{}".format(today.year + 1, string), "%Y-%m-%d"
-            ).astimezone(timezone(TIMEZONE))
+            ).astimezone(sc.timezone)
         return date
     raise ValueError("{} is not valiable".format(string))
 
@@ -301,7 +301,7 @@ def cui_ls(args: list, slackid: str):
 
     index = 1
     list_type = ListType.MINE
-    date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
+    date = today = dt.datetime.now().astimezone(sc.timezone)
     shift_list = []
 
     try:
@@ -370,7 +370,7 @@ def cui_req(args: list, slackid: str):
     :param dict : 投稿する文章を含んだdict
     """
     index = 1
-    date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
+    date = today = dt.datetime.now().astimezone(sc.timezone)
     target = None
     target_time = None
     comment = ""
@@ -441,7 +441,7 @@ def cui_con(args: list, slackid: str):
     :param dict : 投稿する文章を含んだdict
     """
     index = 1
-    date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
+    date = today = dt.datetime.now().astimezone(sc.timezone)
     target = None
     target_time = None
     comment = ""
@@ -520,7 +520,7 @@ def cui_img(args: list, slackid: str):
 
     index = 1
     shift = None
-    date = today = dt.datetime.now().astimezone(timezone(TIMEZONE))
+    date = today = dt.datetime.now().astimezone(sc.timezone)
 
     # 引数の1つ目(eventid or date)を検証
     try:
