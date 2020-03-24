@@ -9,7 +9,6 @@ from enum import Enum, auto
 from pprint import pprint
 
 import requests
-from pytz import timezone
 
 from connectgoogle import TIMEZONE
 from settings import (IM_OPEN, SLACK_BOT_TOKEN, TEMP_CONVERSATION_SHEET,
@@ -81,7 +80,7 @@ def update_temp_conversation(
     text: str = None,
 ):
     values = [
-        dt.datetime.now().astimezone(timezone(TIMEZONE)).isoformat()
+        dt.datetime.now().astimezone(sc.timezone).isoformat()
         if action is not None
         else str(None),
         str(action),
@@ -220,7 +219,7 @@ def check_is_past(base: dt.datetime, date: str):
         datetime.datetime : 基準日より未来である日付
 
     """
-    target = dt.datetime.strptime(date, "%Y/%m/%d").astimezone(timezone(TIMEZONE))
+    target = dt.datetime.strptime(date, "%Y/%m/%d").astimezone(sc.timezone)
     if target < base:
         return target.replace(year=base.year + 1)
     else:
@@ -230,7 +229,7 @@ def check_is_past(base: dt.datetime, date: str):
 def parse_ymd_str(
     date: str,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """parse_ymd_str
@@ -274,7 +273,7 @@ def parse_ymd_str(
 def parse_unclear_date(
     date: str,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """parse_unclear_date
@@ -313,7 +312,7 @@ def parse_weekday(
     weekday: str,
     attach: str = None,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """parse_weekday
@@ -344,14 +343,14 @@ def parse_weekday(
     return (
         base
         + dt.timedelta(days=int(weekday) - int(base.strftime("%w")) + 7 * week_diff)
-    ).astimezone(timezone(TIMEZONE))
+    ).astimezone(sc.timezone)
 
 
 def search_in_date_group(
     dates: list = None,
     days: list = None,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """
@@ -388,7 +387,7 @@ def search_in_weekday_group(
     weekdays: list,
     attach: str,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """
@@ -419,7 +418,7 @@ def search_in_weekday_group(
 def search_in_unclear_group(
     words: list,
     base: dt.datetime = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
+        dt.date.today(), dt.time(hour=0, minute=0), sc.timezone
     ),
 ):
     """
@@ -456,9 +455,7 @@ def find_target_day(words: dict, recorded_dates: list):
     """
 
     suspected_target = []
-    today = dt.datetime.combine(
-        dt.date.today(), dt.time(hour=0, minute=0), timezone(TIMEZONE)
-    )
+    today = dt.datetime.combine(dt.date.today(), dt.time(hour=0, minute=0), sc.timezone)
 
     # まず %m/%d or %d を探索
     suspected_target = search_in_date_group(
@@ -814,7 +811,7 @@ def check_in_sequence(timestamp: str):
     """
     # 最終書き込み時刻を確認 比較対象datetime.isoformat() (ex:2021-03-01T00:00:00+09:00)
     if re.compile(r"(\d){4}-(\d){2}-(\d){2}T(\d){2}:(\d){2}:(\d){2}").search(timestamp):
-        if dt.datetime.now().astimezone(timezone(TIMEZONE)) - dt.datetime.fromisoformat(
+        if dt.datetime.now().astimezone(sc.timezone) - dt.datetime.fromisoformat(
             timestamp
         ) < dt.timedelta(minutes=10):
             return True
