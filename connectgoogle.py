@@ -13,7 +13,6 @@ from apiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from pytz import timezone
 
 from workmanage import DrawShiftImg, Shift, Work, Worker, Worktime
 
@@ -28,7 +27,6 @@ SCOPES = [
     "https://www.googleapis.com/auth/drive.file",
 ]
 TOKEN_URI = os.environ["TOKEN_URI"]
-TIMEZONE = "Asia/Tokyo"
 SPREADSHEETID = "1iung0Vi3DNKOlb_IIV2oYya_0YjUsZaP2oBkjKekvbI"
 BEFORE_OPEN_TIME = 8
 AFTER_CLOSE_TIME = 19
@@ -54,7 +52,8 @@ class ConnectGoogle:
         creds.refresh(Request())
         return creds
 
-    def __init__(self):
+    def __init__(self, timezone: dt.timezone):
+        self.timezone = timezone
         self.creds = self.update_token()
         # ないor無効なら中断
         if not self.creds or not self.creds.valid:
@@ -129,12 +128,13 @@ class ConnectGoogle:
             Note:
                 timeout検出時は再帰的に自身を呼び出しリトライする
             """
-            start = start.astimezone(timezone(TIMEZONE)).isoformat()
-            end = end.astimezone(timezone(TIMEZONE)).isoformat()
+            tzname = start.astimezone(self.timezone).tzname()
+            start = start.astimezone(self.timezone).isoformat()
+            end = end.astimezone(self.timezone).isoformat()
             event = {
                 "summary": summary,
-                "end": {"dateTime": end, "timeZone": TIMEZONE},
-                "start": {"dateTime": start, "timeZone": TIMEZONE},
+                "end": {"dateTime": end, "timeZone": tzname},
+                "start": {"dateTime": start, "timeZone": tzname},
                 "description": description,
             }
 
@@ -161,8 +161,8 @@ class ConnectGoogle:
             end: dt.datetime,
             description: str,
         ):
-            start = start.astimezone(timezone(TIMEZONE)).isoformat()
-            end = end.astimezone(timezone(TIMEZONE)).isoformat()
+            start = start.astimezone(self.timezone).isoformat()
+            end = end.astimezone(self.timezone).isoformat()
             event = (
                 self.service.events()
                 .get(calendarId=calendar, eventId=eventid)
