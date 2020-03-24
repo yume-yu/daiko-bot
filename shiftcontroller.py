@@ -5,9 +5,8 @@ from enum import Enum, auto
 from pprint import pprint
 
 import requests
-from pytz import timezone
 
-from connectgoogle import TIMEZONE, ConnectGoogle
+from connectgoogle import ConnectGoogle
 from workmanage import DrawShiftImg, Work, Worker
 
 FONT = "./.fonts/mplus-1m-regular.ttf"
@@ -58,8 +57,11 @@ class ShiftController:
         BACK = auto()
         INCLUDE = auto()
 
-    def __init__(self):
-        self.gcon = ConnectGoogle()
+    def __init__(self, timezone: dt.timezone = None):
+        self.timezone = (
+            timezone if timezone else dt.timezone(dt.timedelta(hours=9), name="JST")
+        )
+        self.gcon = ConnectGoogle(self.timezone)
         self.calendar = self.gcon.calendar
         self.drive = self.gcon.drive
         self.sheet = self.gcon.sheet
@@ -97,7 +99,7 @@ class ShiftController:
 
     def convert_utc_format(self, target: dt.datetime):
         return_value = (
-            target.astimezone(timezone("UTC")).isoformat().replace("+00:00", "") + "Z"
+            target.astimezone(dt.timezone.utc).isoformat().replace("+00:00", "") + "Z"
         )
         return return_value
 
@@ -265,7 +267,7 @@ class ShiftController:
         """
 
         if not base_date:
-            base_date = dt.datetime.now().astimezone(timezone(TIMEZONE))
+            base_date = dt.datetime.now().astimezone(self.timezone)
         elif isinstance(base_date, dt.datetime):
             # now = date
             pass
@@ -325,8 +327,8 @@ class ShiftController:
 
         return Work(
             staff_name=target.staff_name if staff_name is None else staff_name,
-            start=start.astimezone(timezone(TIMEZONE)),
-            end=end.astimezone(timezone(TIMEZONE)),
+            start=start.astimezone(self.timezone),
+            end=end.astimezone(self.timezone),
             requested=target.requested if requested is None else requested,
             slackid=target.slackid if slackid is None else slackid,
             eventid=target.eventid,
@@ -481,7 +483,7 @@ class ShiftController:
         :param UseWay use_way : ユーザーが利用したUI
         :param Actions action : ユーザーが利用した機能
         """
-        date = dt.datetime.now().astimezone(timezone(TIMEZONE)).strftime("%Y/%m/%d  %X")
+        date = dt.datetime.now().astimezone(self.timezone).strftime("%Y/%m/%d  %X")
         self.sheet.append(
             [date, self.slackid2name(slackId), use_way.value, action.value],
             self.sheet.LOG_SHEET_NAME,
