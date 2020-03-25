@@ -17,7 +17,7 @@ from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
 from interactivemessages import csv_to_dict, get_block
 from settings import *
-from settings import sc
+from settings import ADD_TOKEN, header, sc
 from shiftregistrationapi import parse_formdata
 
 app = Flask(__name__)
@@ -58,6 +58,14 @@ def show_registry_page():
     )
 
 
+def validate_token(token: str):
+    if token in [SLACK_VALID_TOKEN, ADD_TOKEN]:
+        return True
+    else:
+        return False
+
+
+# シフト一括追加API POSTでjsonを受け取る
 @app.route("/add-once", methods=["POST"])
 def add_shifts_at_once():
     parse_formdata(json.loads(request.data))
@@ -65,27 +73,54 @@ def add_shifts_at_once():
     return jsonify({"status": "ok"})
 
 
-@app.route("/cmd", methods=["GET", "POST"])
-def command():
+@app.route("/slack", methods=["POST"])
+def api_for_slack():
 
-    pprint(request.form, stream=sys.stderr)
+    if request.data.decode():
+        # request.dataがあるのはfrom Event API
+        return event_api(json.loads(request.data.decode()))
+    elif request.form.get("payload"):
+        # request.form["payload"]があるのは interactive message
+        return interactive_message(json.loads(request.form.get("payload")))
+    elif request.form.get("command"):
+        # request.form["command"]があるのは slash command
+        return command(request.form)
 
-    # tokenの確認
-    if not validate_token(request.form["token"]):
-        return ""
-
-    # thread = Ready_to_responce(request.form)
-    thread = threading.Thread(target=ready_to_responce, args=(request.form,))
-    thread.start()
-
+    # 該当がなければ空を返す
     return ""
 
 
-def validate_token(token: str):
-    if token in [SLACK_VALID_TOKEN, ADD_TOKEN]:
-        return True
-    else:
-        return False
+def command(data: dict):
+    """
+
+    slashコマンド呼び出しへの対応をする
+
+
+    Args:
+        data (dict): slackからのリクエストの内容
+
+    Returns:
+        str : slackからのリクエストに応じた応答文字列
+
+    Note:
+        * "/d"で呼び出されたときは空文字を返す。実際のレスポンスは別スレッドにて行う。
+        * "/daiko"で呼び出されたときはメニューUIのjsonを返す。
+    """
+
+    # tokenの確認
+    if not validate_token(data["token"]):
+        return ""
+
+    if data.get("command") == "/d":
+        thread = threading.Thread(target=ready_to_responce, args=(data,))
+        thread.start()
+
+        return ""
+    elif data.get("command") == "/daiko":
+        return_dict = get_block("select_action", slack_id=data["user_id"])
+        return jsonify(return_dict)
+
+    return ""
 
 
 def validate_requesttimes(responce_data: dict, state: dict) -> list:
@@ -123,40 +158,47 @@ def validate_requesttimes(responce_data: dict, state: dict) -> list:
     return error_list
 
 
-@app.route("/interactive", methods=["GET", "POST"])
-def check_post():
+def interactive_message(data: dict):
+    """
 
-    pprint(request.form, stream=sys.stderr)
-    pprint(request.data, stream=sys.stderr)
-    get_json = json.loads(request.form["payload"])
-    app.logger.warning(pformat(get_json))
-    # pprint(get_json, stream=app.logger)
-    # logger.debug(get_json)
+    interactive message呼び出しへの対応をする
+
+
+    Args:
+        data (dict): slackからのリクエストの内容
+
+    Returns:
+        str : jsonify({"status":"ok"})
+
+    """
+    # def check_post():
+
+    app.logger.warning(pformat(data))
 
     # tokenの確認
-    if not validate_token(get_json["token"]):
+    if not validate_token(data["token"]):
         return ""
 
     return_block = None
 
     """
     palyload["type"]について
-    * dialog_cancellation   ->  dialogから送信されたデータ
-    * dialog_cancellation   ->  dialogがキャンセルされたことを知らせるデータ
-    * block_actions         ->  block要素を含むメッセージが送出したデータ
+    * dialog_cancellation -> dialogから送信されたデータ
+    * dialog_cancellation -> dialogがキャンセルされたことを知らせるデータ
+    * block_actions -> block要素を含むメッセージが送出したデータ
     """
-    if get_json["type"] == "dialog_submission":
-        responce_data = get_json["submission"]
-        state = csv_to_dict(get_json["state"])
+    if data["type"] == "dialog_submission":
+        responce_data = data["submission"]
+        state = csv_to_dict(data["state"])
 
         error_list = []
-        if get_json["callback_id"] in ("Request", "Contract"):
+        if data["callback_id"] in ("Request", "Contract"):
             error_list = validate_requesttimes(responce_data, state)
-        elif get_json["callback_id"] == "Addname":
-            use_db.add(get_json["user"]["id"], responce_data["name"])
+        elif data["callback_id"] == "Addname":
+            use_db.add(data["user"]["id"], responce_data["name"])
             return_block = get_block("select_action", value=responce_data["name"])
             res = requests.post(
-                get_json["response_url"], json=json.loads(json.dumps(return_block))
+                data["response_url"], json=json.loads(json.dumps(return_block))
             )
             print(res.text)
             return ""
@@ -175,29 +217,29 @@ def check_post():
         )
         responce_data["date"] = state["date"]
 
-        if get_json["callback_id"] == "Request":
+        if data["callback_id"] == "Request":
             return_block = get_block(
                 "request_dialog_ok", target=responce_data, value=new_value
             )
-        elif get_json["callback_id"] == "Contract":
+        elif data["callback_id"] == "Contract":
             return_block = get_block(
                 "contract_dialog_ok", target=responce_data, value=new_value
             )
 
         res = requests.post(
-            get_json["response_url"], json=json.loads(json.dumps(return_block))
+            data["response_url"], json=json.loads(json.dumps(return_block))
         )
         print(res.text)
         return ""
 
-    elif get_json["type"] == "dialog_cancellation":
+    elif data["type"] == "dialog_cancellation":
         return_block = get_block("cancel")
         res = requests.post(
-            get_json["response_url"], json=json.loads(json.dumps(return_block))
+            data["response_url"], json=json.loads(json.dumps(return_block))
         )
         print(res.text)
         return jsonify({"status": "ok"})
-    elif get_json["type"] == "block_actions":
+    elif data["type"] == "block_actions":
 
         # block_actionsへの返答には一旦考え中メッセージを返す
         loading_message = {
@@ -217,7 +259,7 @@ def check_post():
             json=json.loads(json.dumps(loading_message)),
         )
 
-        responce_action = get_json["actions"][0]
+        responce_action = data["actions"][0]
 
         if responce_action["block_id"] == "select_date":
             return_block = get_block(
@@ -227,7 +269,7 @@ def check_post():
                     else "to_contract"
                 ),
                 date=responce_action["selected_date"],
-                slack_id=get_json["user"]["id"],
+                slack_id=data["user"]["id"],
             )
         elif responce_action["block_id"] == "select_shift":
 
@@ -236,7 +278,7 @@ def check_post():
                 eventid=responce_action["selected_option"]["value"],
                 value=responce_action["action_id"],
             )
-            return_block["trigger_id"] = get_json["trigger_id"]
+            return_block["trigger_id"] = data["trigger_id"]
 
             res = requests.post(
                 "https://slack.com/api/dialog.open",
@@ -250,13 +292,13 @@ def check_post():
                 value=csv_to_dict(responce_action["value"])
                 if responce_action["value"] != "cancel"
                 else None,
-                slack_id=get_json["user"]["id"],
+                slack_id=data["user"]["id"],
             )
             return_block = return_block
         elif responce_action["block_id"] in ("show_shift", "switch_type"):
             return_block = get_block(
                 responce_action["block_id"],
-                slack_id=get_json["user"]["id"],
+                slack_id=data["user"]["id"],
                 value=responce_action,
             )
         else:
@@ -264,51 +306,41 @@ def check_post():
                 selected_action = responce_action["value"]
                 return_block = get_block(
                     selected_action,
-                    slack_id=get_json["user"]["id"],
-                    value=get_json.get("actions")[0],
+                    slack_id=data["user"]["id"],
+                    value=data.get("actions")[0],
                 )
 
     if not return_block:
         return_block = get_block("error")
 
-    res = requests.post(
-        get_json["response_url"], json=json.loads(json.dumps(return_block))
-    )
-    print(res.text)
+    res = requests.post(data["response_url"], json=json.loads(json.dumps(return_block)))
     return jsonify({"status": "ok"})
 
 
-@app.route("/daiko", methods=["GET", "POST"])
-def getPost():
+def event_api(data: dict):
+    """
 
-    pprint(request.form, stream=sys.stderr)
-    pprint(request.data, stream=sys.stderr)
-    # pprint(json.loads(request.data.decode()), stream=sys.stderr)
-    slack_token = request.form["token"]
-    # tokenの確認
-    if not validate_token(slack_token):
-        # 無効なトークンだった場合はなにもさせない
-        return ""
-    print(request.form["user_id"])
-    return_dict = get_block("select_action", slack_id=request.form["user_id"])
-    return jsonify(return_dict)
+    Event APIからのデータを処理する呼び出しへの対応をする
 
 
-@app.route("/event", methods=["GET", "POST"])
-def for_eventapi():
-    message_data = json.loads(request.data.decode())
+    Args:
+        data (dict): slackからのリクエストの内容
 
-    # pprint(message_data, stream=sys.stderr)
+    Returns:
+        str : 空文字
+
+    """
+
     # 認証用の処理
-    if message_data.get("challenge"):
-        return message_data["challenge"]
+    if data.get("challenge"):
+        return data["challenge"]
 
     # tokenの確認
-    if not validate_token(message_data["token"]):
+    if not validate_token(data["token"]):
         return ""
 
     # thread = Ready_to_responce(request.form)
-    thread = threading.Thread(target=start_chatmessage_process, args=(message_data,))
+    thread = threading.Thread(target=start_chatmessage_process, args=(data,))
     thread.start()
 
     return ""
