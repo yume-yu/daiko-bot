@@ -1,0 +1,55 @@
+#origin {
+  display:none;
+}
+
+main {
+  margin: 0 10vw;
+}
+
+button {
+  padding: 0;
+}
+
+div.weekday {
+  display: flex;
+  flex-direction: column;
+  /*
+  border-top: solid black 0.5px;
+  border-bottom: solid black 0.5px;
+  border-left: solid black 1px;
+  border-right: solid black 1px;
+  */
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 450px 1px 1fr 1px;
+  grid-template-rows: 100%;
+  padding: 1rem
+}
+
+.row > span {
+  display: inline-block;
+  height: 100%;
+}
+
+.row > span:nth-child(3) {
+  background-color: black;
+  height: 20%;
+  text-align: center;
+  margin: auto 0;
+  margin-right:50%;
+  margin-left: 50%;
+}
+
+.row > span:nth-child(even){
+  height: 100%;
+  background-color: black;
+}
+
+/*
+.row > span:last-child:before, .row > span:last-child:after {
+  content:"\00A0";
+  border-right: solid black 0.5px;
+}
+*/

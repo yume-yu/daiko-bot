@@ -1,0 +1,57 @@
+{% extends "layout.html" %}
+{% block content %}
+<link href="/static/css/regist.css" rel="stylesheet" type="text/css">
+<div id="date_range">
+  <h2>シフトを登録する期間</h2>
+  <label>開始日: <input name="start-day" type="date" /></label>
+  <label>終了日: <input name="end-day" type="date" /></label>
+</div>
+<div id="mon" class="weekday ">
+  <h2>月曜日</h2>
+</div>
+<div id="tue" class="weekday ">
+  <h2>火曜日</h2>
+</div>
+<div id="wed" class="weekday ">
+  <h2>水曜日</h2>
+</div>
+<div id="thu" class="weekday ">
+  <h2>木曜日</h2>
+</div>
+<div id="fri" class="weekday ">
+  <h2>金曜日</h2>
+</div>
+<p id="origin">
+  <span>
+    <label>名前:</label>
+    <select name="slackid">
+      {% for (key,item) in members %}
+      <option value="{{ key }}">{{ item }}</option>
+      {% endfor %}
+    </select>
+    <datalist id="times">
+      <option value="09:00"></option>
+      <option value="10:00"></option>
+      <option value="11:00"></option>
+      <option value="12:00"></option>
+      <option value="13:00"></option>
+      <option value="14:00"></option>
+      <option value="15:00"></option>
+      <option value="16:00"></option>
+      <option value="17:00"></option>
+      <option value="18:00"></option>
+      <option value="19:00"></option>
+    </datalist>
+
+    <input name="start" value="09:00" type="time" list="times" min="09:00:00" max="19:00:00" required></input>
+    <span>〜</span>
+    <input name="end" value="19:00" type="time" list="times" min="09:00:00" max="19:00:00" required></input>
+    <button class="add_button fas fa-plus-square"></button>
+    <button class="rm_button fas fa-minus-square"></button>
+  </span>
+  <span></span>
+  <span></span>
+  <span></span>
+</p>
+<script type="text/javascript" src="static/js/regist.js"></script>
+{% endblock %}

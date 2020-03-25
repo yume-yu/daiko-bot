@@ -1,0 +1,28 @@
+html {
+  font-size: 10px;
+}
+
+header {
+  background-color: rgb(30	,35	,84	);
+}
+
+h1 {
+  font-size:  4rem;
+}
+
+h2 {
+  width:auto;
+  font-size:  3.5rem;
+  padding-bottom: 1.5rem;
+  padding-top :1.5rem;
+}
+
+header h1{
+  padding: 2.5rem 0 ;
+  margin-left : 7vw;
+  color: rgb(220,220,220);
+}
+
+main {
+  margin: 0 10vw;
+}

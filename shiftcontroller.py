@@ -30,8 +30,14 @@ class ShiftController:
     """
 
     class UseWay(Enum):
-        """
-        使用方法
+        """UseWay
+
+        logに記録される、利用したインターフェイス。
+
+        Attributes:
+            CHAT (str): チャット形式
+            BUTTONS (str): ボタン類を使ったGUI
+            COMM (str): コマンド形式
         """
 
         CHAT = "チャット形式"
@@ -351,9 +357,18 @@ class ShiftController:
         else:
             return self.DevPos.INCLUDE
 
-    def insert_shift(self, new_work: Work):
+    def insert_shift(self, new_work: Work, recurrence=None):
         """
-        新規シフトをGoogleCalendarに登録する
+
+        新規のシフトをGoogleCalendarに登録する
+
+        Args:
+            new_work (Work): 追加するシフト
+            recurrence (str): 予定の繰り返しパターン文字列
+
+        Returns:
+            dict : 追加したシフトの情報
+
         """
         # 新規作成分をinsert
         res = self.calendar.insert_event(
@@ -362,6 +377,7 @@ class ShiftController:
             start=new_work.start,
             end=new_work.end,
             description=new_work.slackid,
+            recurrence=recurrence,
         )
         return res
 
@@ -523,13 +539,10 @@ if __name__ == "__main__":
     target_work = sc.get_shift(eventid="482tl6pqqr98sm9rtae92p1s45")
     pprint(
         sc.contract(
-            target_work.eventid,
-            "UJVTGPGKU",
-            # target_work.start + dt.timedelta(hours=1),
-            target_work.start,
-            target_work.end,
-            # target_work.end + dt.timedelta(hours=-1),
+            target_work.eventid, "UJVTGPGKU", target_work.start, target_work.end
         )
     )
+    # target_work.start + dt.timedelta(hours=1),
+    # target_work.end + dt.timedelta(hours=-1),
     # pprint(list(sc.get_week_shift(base_date=date, grouping_by_week=True)))
     # pprint(sc.get_shift(date=date, slackid="password", only_active=True))

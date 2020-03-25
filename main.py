@@ -10,12 +10,15 @@ from logging import StreamHandler
 from pprint import pformat, pprint
 
 import requests
-from chatmessage import start_chatmessage_process
-from cuimessage import make_msg, ready_to_responce
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_httpauth import HTTPDigestAuth
+
+from chatmessage import start_chatmessage_process
+from cuimessage import make_msg, ready_to_responce
 from interactivemessages import csv_to_dict, get_block
 from settings import *
+from settings import sc
+from shiftregistrationapi import parse_formdata
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "qwertyuiop"
@@ -41,10 +44,31 @@ def show_entries():
     # return str("hello, world")
 
 
+@app.route("/get-users")
+def get_users_dict():
+    return jsonify(sc.sheet.get_slackId2name_dict())
+
+
+@app.route("/reg-form")
+def show_registry_page():
+    name_dict = sc.sheet.get_slackId2name_dict()
+    pprint(name_dict, stream=sys.stderr)
+    return render_template(
+        "regist.html", members=zip(name_dict.keys(), name_dict.values()), title="www"
+    )
+
+
+@app.route("/add-once", methods=["POST"])
+def add_shifts_at_once():
+    parse_formdata(json.loads(request.data))
+
+    return jsonify({"status": "ok"})
+
+
 @app.route("/cmd", methods=["GET", "POST"])
 def command():
 
-    # print(request.form)
+    pprint(request.form, stream=sys.stderr)
 
     # tokenの確認
     if not validate_token(request.form["token"]):
@@ -102,6 +126,8 @@ def validate_requesttimes(responce_data: dict, state: dict) -> list:
 @app.route("/interactive", methods=["GET", "POST"])
 def check_post():
 
+    pprint(request.form, stream=sys.stderr)
+    pprint(request.data, stream=sys.stderr)
     get_json = json.loads(request.form["payload"])
     app.logger.warning(pformat(get_json))
     # pprint(get_json, stream=app.logger)
@@ -255,6 +281,9 @@ def check_post():
 @app.route("/daiko", methods=["GET", "POST"])
 def getPost():
 
+    pprint(request.form, stream=sys.stderr)
+    pprint(request.data, stream=sys.stderr)
+    # pprint(json.loads(request.data.decode()), stream=sys.stderr)
     slack_token = request.form["token"]
     # tokenの確認
     if not validate_token(slack_token):
@@ -269,6 +298,7 @@ def getPost():
 def for_eventapi():
     message_data = json.loads(request.data.decode())
 
+    # pprint(message_data, stream=sys.stderr)
     # 認証用の処理
     if message_data.get("challenge"):
         return message_data["challenge"]

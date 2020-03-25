@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="jp">
+  <head>
+    <title>{{ title }}</title>
+    <meta charset="utf-8">
+    <link href="/static/css/reset.css" rel="stylesheet" type="text/css">
+    <link href="/static/css/common.css" rel="stylesheet" type="text/css">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css" integrity="sha384-UHRtZLI+pbxtHCWp1t77Bi1L4ZtiqrqD80Kn4Z8NTSRyMA2Fd33n5dQ8lWUE00s/" media="print" onload="this.media='all'" crossorigin="anonymous">
+  </head>
+  <body>
+    <header>
+      <h1>{{ title }}</h1>
+    </header>
+    <main>
+    {% block content %}
+    <!-- ここにメインコンテンツを書く -->
+    {% endblock %}
+    </main>
+  </body>
+</html>
