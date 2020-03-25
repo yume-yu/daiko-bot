@@ -1,3 +1,4 @@
 static/img/shiftimage-*.jpg
 .env
 token.pickle
+testcodes/*
