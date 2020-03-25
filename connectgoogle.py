@@ -62,7 +62,7 @@ class ConnectGoogle:
 
         # service = build("calendar", "v3", credentials=creds)
         self.calendar = self.GoogleCalendar(
-            build("calendar", "v3", credentials=self.creds)
+            build("calendar", "v3", credentials=self.creds), self.timezone
         )
         self.sheet = self.GoogleSpreadSheet(
             build("sheets", "v4", credentials=self.creds)
@@ -70,8 +70,9 @@ class ConnectGoogle:
         self.drive = self.GoogleDrive(build("drive", "v3", credentials=self.creds))
 
     class GoogleCalendar:
-        def __init__(self, service):
+        def __init__(self, service, timezone: dt.timezone):
             self.service = service
+            self.timezone = timezone
 
         def get_calenderID(self):
             calendar_list = self.service.calendarList().list().execute()
