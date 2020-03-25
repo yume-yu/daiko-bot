@@ -302,8 +302,6 @@ class ConnectGoogle:
 
             try:
                 response = request.execute()
-            except g_errors as e:
-                gcon_error_out("catch e_errors\n{}".format(e))
             except socket.timeout:
                 gcon_error_out("catch timeout in GoogleSpreadSheet.get(). retry")
                 return self.get(sheetName)
@@ -330,8 +328,6 @@ class ConnectGoogle:
                     )
                     .execute()
                 )
-            except g_errors as e:
-                gcon_error_out("catch e_errors\n{}".format(e))
             except socket.timeout:
                 gcon_error_out("catch timeout in GoogleSpreadSheet.append(). retry...")
                 return self.append(sheetName)
@@ -357,8 +353,6 @@ class ConnectGoogle:
                     )
                     .execute()
                 )
-            except g_errors as e:
-                gcon_error_out("catch e_errors\n{}".format(e))
             except socket.timeout:
                 gcon_error_out("catch timeout in GoogleSpreadSheet.update(). retry...")
                 return self.append(sheetName)
@@ -409,8 +403,6 @@ class ConnectGoogle:
                     .create(body=file_metadata, media_body=media_body, fields="id")
                     .execute()
                 )
-            except g_errors as e:
-                gcon_error_out("catch e_errors\n{}".format(e))
             except socket.timeout:
                 gcon_error_out("catch timeout in GoogleDrive().upload. retry...")
                 return self.upload(
