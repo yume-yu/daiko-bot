@@ -38,9 +38,8 @@ def get_pw(username):
 
 
 @app.route("/")
-@auth.login_required
 def show_entries():
-    return render_template("index.html", imgpath="./static/img/sample.jpg")
+    return "ok, wakeup!"
     # return str("hello, world")
 
 
@@ -50,6 +49,7 @@ def get_users_dict():
 
 
 @app.route("/reg-form")
+@auth.login_required
 def show_registry_page():
     name_dict = sc.sheet.get_slackId2name_dict()
     pprint(name_dict, stream=sys.stderr)
