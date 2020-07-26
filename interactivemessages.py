@@ -90,7 +90,7 @@ def make_shift_list(slack_id, request: bool, date: str = None) -> dict:
     date = (
         dt.datetime.strptime(date, "%Y-%m-%d")
         if date is not None
-        else dt.datetime.now()
+        else dt.datetime.now().astimezone(sc.timezone)
     )
     # テンプレートをコピーして文言準備
     # 依頼か請負かでの文言変更
@@ -281,7 +281,7 @@ def get_shift_image(slackid, value):
     :param str slackid : 呼び出したユーザーのslackid
     """
     is_day = False
-    date = dt.datetime.now()
+    date = dt.datetime.now().astimezone(sc.timezone)
     value_dict = {"date": None, "is_day": None}
 
     print(value)
@@ -534,7 +534,9 @@ select_nearly = {
             "accessory": {
                 "type": "datepicker",
                 "action_id": "",
-                "initial_date": dt.datetime.now().strftime("%Y-%m-%d"),
+                "initial_date": dt.datetime.now()
+                .astimezone(sc.timezone)
+                .strftime("%Y-%m-%d"),
                 "placeholder": {
                     "type": "plain_text",
                     "text": "Select a date",
