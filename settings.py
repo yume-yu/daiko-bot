@@ -1,14 +1,17 @@
 import datetime as dt
 import os
 
+import make_dict
+import shiftcontroller
+from pytz import timezone
+
+"""
 from janome.analyzer import Analyzer
 from janome.charfilter import *
 from janome.tokenfilter import *
 from janome.tokenizer import Tokenizer
-from pytz import timezone
+"""
 
-import make_dict
-import shiftcontroller
 
 SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
 SLACK_VALID_TOKEN = os.environ["SLACK_VALID_TOKEN"]
@@ -19,6 +22,7 @@ header = {
     "Authorization": "Bearer " + SLACK_BOT_TOKEN,
 }
 
+"""
 while True:
     try:
         TOKENIZER = Tokenizer("daiko-dict.csv", udic_type="simpledic", udic_enc="utf8")
@@ -49,5 +53,5 @@ IM_OPEN = "https://slack.com/api/im.open"
 analyzer = Analyzer(
     char_filters=CHAR_FILTERS, tokenizer=TOKENIZER, token_filters=TOKEN_FILTERS
 )
-
+"""
 sc = shiftcontroller.ShiftController(timezone=JST)

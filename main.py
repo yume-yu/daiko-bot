@@ -10,11 +10,10 @@ from logging import StreamHandler
 from pprint import pformat, pprint
 
 import requests
-from flask import Flask, jsonify, redirect, render_template, request, url_for
-from flask_httpauth import HTTPDigestAuth
-
 from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
+from flask import Flask, jsonify, redirect, render_template, request, url_for
+from flask_httpauth import HTTPDigestAuth
 from interactivemessages import csv_to_dict, get_block
 from settings import *
 from settings import ADD_TOKEN, header, sc
@@ -340,8 +339,8 @@ def event_api(data: dict):
         return ""
 
     # thread = Ready_to_responce(request.form)
-    thread = threading.Thread(target=start_chatmessage_process, args=(data,))
-    thread.start()
+    # thread = threading.Thread(target=start_chatmessage_process, args=(data,))
+    # thread.start()
 
     return ""
 
