@@ -10,7 +10,7 @@ from logging import StreamHandler
 from pprint import pformat, pprint
 
 import requests
-from chatmessage import start_chatmessage_process
+# from chatmessage import start_chatmessage_process
 from cuimessage import make_msg, ready_to_responce
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_httpauth import HTTPDigestAuth
