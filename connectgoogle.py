@@ -13,7 +13,6 @@ from apiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-
 from workmanage import DrawShiftImg, Shift, Work, Worker, Worktime
 
 socket.setdefaulttimeout(10)
@@ -26,8 +25,8 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive.file",
 ]
-TOKEN_URI = os.environ["TOKEN_URI"]
-SPREADSHEETID = "1iung0Vi3DNKOlb_IIV2oYya_0YjUsZaP2oBkjKekvbI"
+TOKEN_URI = CLIENT_SECRET_JSON["token_uri"]
+SPREADSHEETID = os.environ["DATABASE_SHEET"]
 BEFORE_OPEN_TIME = 8
 AFTER_CLOSE_TIME = 19
 
